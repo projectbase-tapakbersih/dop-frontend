@@ -6,6 +6,8 @@
     <title>Login - Tapak Bersih</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <!-- SweetAlert2 CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <style>
         body {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -25,6 +27,9 @@
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(0,0,0,0.3);
         }
+        .is-invalid {
+            border-color: #dc3545;
+        }
     </style>
 </head>
 <body>
@@ -38,9 +43,6 @@
                             <h2 class="fw-bold text-primary">👟 Tapak Bersih</h2>
                             <p class="text-muted">Masuk ke akun Anda</p>
                         </div>
-
-                        <!-- Alert -->
-                        <div id="alert-container"></div>
 
                         <!-- Login Form -->
                         <form id="loginForm">
@@ -68,7 +70,7 @@
                             </div>
 
                             <div class="mb-3 form-check">
-                                <input type="checkbox" class="form-check-input" id="remember">
+                                <input type="checkbox" class="form-check-input" name="remember" id="remember">
                                 <label class="form-check-label" for="remember">Ingat saya</label>
                             </div>
 
@@ -152,6 +154,198 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="<?= base_url('assets/js/auth.js') ?>"></script>
+    <!-- SweetAlert2 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        const BASE_URL = '<?= base_url() ?>';
+
+        // Clear all validation errors
+        function clearErrors() {
+            document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+            document.querySelectorAll('.invalid-feedback').forEach(el => {
+                el.textContent = '';
+                el.style.display = 'none';
+            });
+        }
+
+        // Show validation errors
+        function showErrors(errors) {
+            clearErrors();
+            for (const [field, messages] of Object.entries(errors)) {
+                const input = document.getElementById(field);
+                const errorDiv = document.getElementById(`error-${field}`);
+                
+                if (input && errorDiv) {
+                    input.classList.add('is-invalid');
+                    errorDiv.textContent = Array.isArray(messages) ? messages[0] : messages;
+                    errorDiv.style.display = 'block';
+                }
+            }
+        }
+
+        // Toggle password visibility
+        document.getElementById('togglePassword').addEventListener('click', function() {
+            const passwordInput = document.getElementById('password');
+            const icon = this.querySelector('i');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                icon.classList.replace('bi-eye', 'bi-eye-slash');
+            } else {
+                passwordInput.type = 'password';
+                icon.classList.replace('bi-eye-slash', 'bi-eye');
+            }
+        });
+
+        // Login Form Submit
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            clearErrors();
+
+            const btnLogin = document.getElementById('btnLogin');
+            const btnText = document.getElementById('btnText');
+            const btnLoading = document.getElementById('btnLoading');
+
+            // Disable button and show loading
+            btnLogin.disabled = true;
+            btnText.classList.add('d-none');
+            btnLoading.classList.remove('d-none');
+
+            const formData = new FormData(this);
+            const data = Object.fromEntries(formData);
+
+            try {
+                const response = await fetch(`${BASE_URL}/auth/process-login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams(data)
+                });
+
+                const result = await response.json();
+                
+                console.log('Login response:', result); // Debug log
+
+                // Re-enable button
+                btnLogin.disabled = false;
+                btnText.classList.remove('d-none');
+                btnLoading.classList.add('d-none');
+
+                if (result.success) {
+                    // Success SweetAlert
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Berhasil!',
+                        text: result.message || 'Login berhasil!',
+                        confirmButtonColor: '#667eea',
+                        confirmButtonText: 'OK',
+                        timer: 1500,
+                        timerProgressBar: true
+                    }).then(() => {
+                        window.location.href = result.redirect;
+                    });
+                } else {
+                    // Check if there are validation errors
+                    if (result.errors && Object.keys(result.errors).length > 0) {
+                        showErrors(result.errors);
+                    }
+                    
+                    // Always show SweetAlert with the error message
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Login Gagal',
+                        text: result.message || 'Email/Password salah',
+                        confirmButtonColor: '#dc3545',
+                        confirmButtonText: 'OK'
+                    });
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                
+                // Re-enable button
+                btnLogin.disabled = false;
+                btnText.classList.remove('d-none');
+                btnLoading.classList.add('d-none');
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Kesalahan Koneksi',
+                    text: 'Terjadi kesalahan saat menghubungi server. Silakan coba lagi.',
+                    confirmButtonColor: '#dc3545',
+                    confirmButtonText: 'OK'
+                });
+            }
+        });
+
+        // Guest Checkout
+        document.getElementById('btnGuestCheckout').addEventListener('click', async function() {
+            clearErrors();
+
+            const guestForm = document.getElementById('guestForm');
+            const formData = new FormData(guestForm);
+            const data = Object.fromEntries(formData);
+
+            // Basic validation
+            if (!data.guest_name || !data.guest_phone) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Data Tidak Lengkap',
+                    text: 'Nama dan nomor telepon wajib diisi',
+                    confirmButtonColor: '#ffc107',
+                    confirmButtonText: 'OK'
+                });
+                return;
+            }
+
+            // Disable button
+            this.disabled = true;
+            this.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Loading...';
+
+            try {
+                const response = await fetch(`${BASE_URL}/auth/guest-checkout`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    window.location.href = result.redirect;
+                } else {
+                    if (result.errors) {
+                        showErrors(result.errors);
+                    }
+                    
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Gagal',
+                        text: result.message || 'Terjadi kesalahan',
+                        confirmButtonColor: '#dc3545',
+                        confirmButtonText: 'OK'
+                    });
+
+                    this.disabled = false;
+                    this.innerHTML = 'Lanjutkan';
+                }
+            } catch (error) {
+                console.error('Guest checkout error:', error);
+                
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Kesalahan Koneksi',
+                    text: 'Terjadi kesalahan. Silakan coba lagi.',
+                    confirmButtonColor: '#dc3545',
+                    confirmButtonText: 'OK'
+                });
+                
+                this.disabled = false;
+                this.innerHTML = 'Lanjutkan';
+            }
+        });
+    </script>
 </body>
 </html>

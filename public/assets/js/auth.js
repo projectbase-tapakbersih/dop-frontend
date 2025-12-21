@@ -128,13 +128,13 @@ if (registerForm) {
         clearErrors();
 
         const btnRegister = document.getElementById('btnRegister');
-        const btnText = btnRegister.querySelector('#btnText');
-        const btnLoading = btnRegister.querySelector('#btnLoading');
+        const btnText = document.getElementById('btnRegisterText');
+        const btnLoading = document.getElementById('btnRegisterLoading');
 
         // Disable button and show loading
         btnRegister.disabled = true;
-        btnText.classList.add('d-none');
-        btnLoading.classList.remove('d-none');
+        if (btnText) btnText.classList.add('d-none');
+        if (btnLoading) btnLoading.classList.remove('d-none');
 
         const formData = new FormData(this);
         const data = Object.fromEntries(formData);
@@ -150,6 +150,8 @@ if (registerForm) {
 
             const result = await response.json();
 
+            console.log('Register response:', result); // Debug log
+
             if (result.success) {
                 showAlert(result.message, 'success');
                 setTimeout(() => {
@@ -158,14 +160,15 @@ if (registerForm) {
             } else {
                 if (result.errors) {
                     showErrors(result.errors);
-                } else {
+                }
+                if (result.message) {
                     showAlert(result.message, 'danger');
                 }
 
                 // Re-enable button
                 btnRegister.disabled = false;
-                btnText.classList.remove('d-none');
-                btnLoading.classList.add('d-none');
+                if (btnText) btnText.classList.remove('d-none');
+                if (btnLoading) btnLoading.classList.add('d-none');
             }
         } catch (error) {
             console.error('Register error:', error);
@@ -173,8 +176,8 @@ if (registerForm) {
 
             // Re-enable button
             btnRegister.disabled = false;
-            btnText.classList.remove('d-none');
-            btnLoading.classList.add('d-none');
+            if (btnText) btnText.classList.remove('d-none');
+            if (btnLoading) btnLoading.classList.add('d-none');
         }
     });
 }
