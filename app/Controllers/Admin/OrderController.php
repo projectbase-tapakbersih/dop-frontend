@@ -4,16 +4,25 @@ namespace App\Controllers\Admin;
 
 use App\Controllers\BaseController;
 
+/**
+ * Admin Order Management Controller
+ * 
+ * API Endpoints:
+ * - GET /api/admin/orders - List all orders
+ * - GET /api/admin/orders/{order_number} - Show order detail
+ * - PATCH /api/admin/orders/{order_number}/status - Update status
+ * - DELETE /api/admin/orders/{order_number} - Cancel/Delete order
+ */
 class OrderController extends BaseController
 {
     public function __construct()
     {
-        helper(['api', 'url']);
+        helper(['api', 'url', 'form']);
     }
 
     /**
-     * List all orders (admin)
-     * Note: API route not explicitly listed, might need to use /api/orders
+     * List all orders
+     * API: GET /api/admin/orders
      */
     public function index()
     {
@@ -22,16 +31,20 @@ class OrderController extends BaseController
         }
 
         $data = [
-            'title' => 'Manajemen Pesanan',
+            'title' => 'Manajemen Order - Admin',
             'orders' => [],
             'error' => null
         ];
 
-        // Try to get orders (might need specific admin endpoint)
-        $response = api_request('/orders', 'GET', [], true);
+        $response = api_request('/admin/orders', 'GET', [], true);
+        
+        log_message('info', 'Admin Orders Response: ' . json_encode($response));
 
-        if (isset($response['success']) && $response['success']) {
-            $data['orders'] = $response['data'] ?? [];
+        $orders = $this->parseResponse($response);
+        $data['orders'] = $orders;
+
+        if (isset($response['message']) && empty($orders)) {
+            $data['error'] = $response['message'];
         }
 
         return view('admin/orders/index', $data);
@@ -41,24 +54,36 @@ class OrderController extends BaseController
      * Show order detail
      * API: GET /api/admin/orders/{order_number}
      */
-    public function detail($orderNumber)
+    public function show($orderNumber)
     {
         if (!is_admin()) {
             return redirect()->to('/')->with('error', 'Access denied');
         }
 
         $data = [
-            'title' => 'Detail Pesanan - ' . $orderNumber,
+            'title' => 'Detail Order - Admin',
             'order' => null,
             'error' => null
         ];
 
         $response = api_request("/admin/orders/{$orderNumber}", 'GET', [], true);
+        
+        log_message('info', 'Admin Order Detail Response: ' . json_encode($response));
 
-        if (isset($response['success']) && $response['success']) {
-            $data['order'] = $response['data'] ?? null;
-        } else {
-            $data['error'] = $response['message'] ?? 'Pesanan tidak ditemukan';
+        if (is_array($response)) {
+            if (isset($response['success']) && $response['success']) {
+                $data['order'] = $response['data'] ?? null;
+            } elseif (isset($response['order_number'])) {
+                $data['order'] = $response;
+            } elseif (isset($response['data'])) {
+                $data['order'] = $response['data'];
+            } elseif (isset($response['message'])) {
+                $data['error'] = $response['message'];
+            }
+        }
+
+        if (!$data['order']) {
+            $data['error'] = 'Order tidak ditemukan';
         }
 
         return view('admin/orders/detail', $data);
@@ -67,45 +92,97 @@ class OrderController extends BaseController
     /**
      * Update order status
      * API: PATCH /api/admin/orders/{order_number}/status
+     * 
+     * Format:
+     * {
+     *   "order_status": "on_the_way_to_workshop",
+     *   "notes": "Kurir sedang mengantar ke workshop"
+     * }
      */
     public function updateStatus($orderNumber)
     {
         if (!is_admin()) {
-            return $this->response->setJSON([
-                'success' => false,
-                'message' => 'Unauthorized'
-            ]);
+            return $this->response->setJSON(['success' => false, 'message' => 'Access denied']);
         }
 
-        $data = [
-            'status' => $this->request->getPost('status'),
-            'notes' => $this->request->getPost('notes')
+        $postData = [
+            'order_status' => $this->request->getPost('order_status')
         ];
 
-        $response = api_request("/admin/orders/{$orderNumber}/status", 'PATCH', $data, true);
+        $notes = $this->request->getPost('notes');
+        if (!empty($notes)) {
+            $postData['notes'] = $notes;
+        }
 
-        return $this->response->setJSON($response);
+        log_message('info', 'Order Status Update Data: ' . json_encode($postData));
+
+        $response = api_request("/admin/orders/{$orderNumber}/status", 'PATCH', $postData, true);
+        
+        log_message('info', 'Order Status Update Response: ' . json_encode($response));
+
+        if (isset($response['success']) && $response['success']) {
+            return $this->response->setJSON(['success' => true, 'message' => 'Status order berhasil diupdate']);
+        }
+
+        return $this->response->setJSON(['success' => false, 'message' => $response['message'] ?? 'Gagal mengupdate status order']);
     }
 
     /**
-     * Cancel order (admin)
+     * Cancel/Delete order
      * API: DELETE /api/admin/orders/{order_number}
      */
     public function cancel($orderNumber)
     {
         if (!is_admin()) {
-            return $this->response->setJSON([
-                'success' => false,
-                'message' => 'Unauthorized'
-            ]);
+            return $this->response->setJSON(['success' => false, 'message' => 'Access denied']);
         }
 
-        $data = [
-            'reason' => $this->request->getPost('reason')
-        ];
+        $response = api_request("/admin/orders/{$orderNumber}", 'DELETE', [], true);
+        
+        log_message('info', 'Order Cancel Response: ' . json_encode($response));
 
-        $response = api_request("/admin/orders/{$orderNumber}", 'DELETE', $data, true);
+        if (isset($response['success']) && $response['success']) {
+            return $this->response->setJSON(['success' => true, 'message' => 'Order berhasil dibatalkan']);
+        }
 
-        return $this->response->setJSON($response);
+        return $this->response->setJSON(['success' => false, 'message' => $response['message'] ?? 'Gagal membatalkan order']);
+    }
+
+    /**
+     * Parse API response to array
+     */
+    private function parseResponse($response)
+    {
+        $items = [];
+
+        if (is_array($response)) {
+            if (isset($response[0]) && is_array($response[0]) && isset($response[0]['order_number'])) {
+                $items = $response;
+            } elseif (isset($response['success']) && $response['success']) {
+                $responseData = $response['data'] ?? [];
+                if (isset($responseData['data']) && is_array($responseData['data'])) {
+                    $items = $responseData['data'];
+                } elseif (is_array($responseData) && isset($responseData[0])) {
+                    $items = $responseData;
+                } elseif (is_array($responseData)) {
+                    $items = $responseData;
+                }
+            } elseif (isset($response['data']) && is_array($response['data'])) {
+                if (isset($response['data']['data'])) {
+                    $items = $response['data']['data'];
+                } else {
+                    $items = $response['data'];
+                }
+            }
+        }
+
+        $validItems = [];
+        foreach ($items as $item) {
+            if (is_array($item) && (isset($item['order_number']) || isset($item['id']))) {
+                $validItems[] = $item;
+            }
+        }
+
+        return $validItems;
     }
 }

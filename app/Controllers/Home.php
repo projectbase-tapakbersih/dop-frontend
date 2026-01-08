@@ -11,7 +11,7 @@ class Home extends BaseController
 
     /**
      * Landing Page
-     * Display: Hero, Featured Services, Gallery Preview, Branches
+     * Display: Hero, Services Summary, Features, Gallery Preview, Testimonials, CTA
      */
     public function index()
     {
@@ -19,25 +19,30 @@ class Home extends BaseController
             'title' => 'Tapak Bersih - Layanan Perawatan Sepatu Profesional',
             'services' => [],
             'galleries' => [],
-            'branches' => []
+            'branches' => [],
+            'stats' => [
+                'total_customers' => '1000+',
+                'shoes_cleaned' => '5000+',
+                'satisfaction_rate' => '99%',
+                'branches' => '5+'
+            ]
         ];
 
-        // Get featured services (limit 6)
+        // Get services (all for summary display)
         $servicesResponse = api_request('/services', 'GET');
         if (isset($servicesResponse['success']) && $servicesResponse['success']) {
-            $allServices = $servicesResponse['data'] ?? [];
-            $data['services'] = array_slice($allServices, 0, 6);
+            $data['services'] = $servicesResponse['data'] ?? [];
         }
 
-        // Get gallery preview (limit 6)
+        // Get gallery preview (limit 6 for showcase)
         $galleriesResponse = api_request('/galleries', 'GET');
         if (isset($galleriesResponse['success']) && $galleriesResponse['success']) {
             $allGalleries = $galleriesResponse['data'] ?? [];
             $data['galleries'] = array_slice($allGalleries, 0, 6);
         }
 
-        // Get branches
-        $branchesResponse = api_request('/branches', 'GET');
+        // Get active branches
+        $branchesResponse = api_request('/branches/active', 'GET');
         if (isset($branchesResponse['success']) && $branchesResponse['success']) {
             $data['branches'] = $branchesResponse['data'] ?? [];
         }

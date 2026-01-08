@@ -12,76 +12,91 @@ class BranchController extends BaseController
     }
 
     /**
-     * Display all branches
+     * Branches List Page
+     * GET /branches or /cabang
      * API: GET /api/branches
      */
     public function index()
     {
         $data = [
-            'title' => 'Lokasi Cabang Kami',
+            'title' => 'Cabang Kami - Tirta Bersih Laundry',
             'branches' => [],
             'error' => null
         ];
 
-        $response = api_request('/branches', 'GET');
+        $response = api_request('/branches', 'GET', [], false);
+        
+        log_message('info', 'Public Branches Response: ' . json_encode($response));
 
-        log_message('info', 'Branches Response: ' . json_encode($response));
+        $branches = [];
 
-        if (isset($response['success']) && $response['success']) {
-            $data['branches'] = $response['data'] ?? [];
-        } else {
-            $data['error'] = $response['message'] ?? 'Gagal memuat cabang';
+        if (is_array($response)) {
+            if (isset($response[0]) && is_array($response[0]) && isset($response[0]['id'])) {
+                $branches = $response;
+            } elseif (isset($response['success']) && $response['success']) {
+                $responseData = $response['data'] ?? [];
+                if (isset($responseData['data']) && is_array($responseData['data'])) {
+                    $branches = $responseData['data'];
+                } elseif (is_array($responseData) && isset($responseData[0])) {
+                    $branches = $responseData;
+                }
+            } elseif (isset($response['data']) && is_array($response['data'])) {
+                $branches = $response['data'];
+            } elseif (isset($response['message'])) {
+                $data['error'] = $response['message'];
+            }
         }
+
+        // Filter active branches only
+        $validBranches = [];
+        foreach ($branches as $branch) {
+            if (is_array($branch) && isset($branch['id'])) {
+                if (!isset($branch['is_active']) || $branch['is_active']) {
+                    $validBranches[] = $branch;
+                }
+            }
+        }
+
+        $data['branches'] = $validBranches;
 
         return view('catalog/branches/index', $data);
     }
 
     /**
-     * Display only active branches
-     * API: GET /api/branches/active
-     */
-    public function active()
-    {
-        $data = [
-            'title' => 'Cabang Aktif',
-            'branches' => [],
-            'error' => null
-        ];
-
-        $response = api_request('/branches/active', 'GET');
-
-        log_message('info', 'Active Branches Response: ' . json_encode($response));
-
-        if (isset($response['success']) && $response['success']) {
-            $data['branches'] = $response['data'] ?? [];
-        } else {
-            $data['error'] = $response['message'] ?? 'Gagal memuat cabang aktif';
-        }
-
-        return view('catalog/branches/index', $data);
-    }
-
-    /**
-     * Display branch detail
+     * Branch Detail Page
+     * GET /branches/{id}
      * API: GET /api/branches/{id}
      */
     public function detail($id)
     {
         $data = [
-            'title' => 'Detail Cabang',
+            'title' => 'Detail Cabang - Tirta Bersih Laundry',
             'branch' => null,
             'error' => null
         ];
 
-        $response = api_request("/branches/{$id}", 'GET');
+        $response = api_request("/branches/{$id}", 'GET', [], false);
+        
+        log_message('info', 'Branch Detail Response: ' . json_encode($response));
 
-        log_message('info', "Branch {$id} Response: " . json_encode($response));
+        if (is_array($response)) {
+            if (isset($response['id'])) {
+                $data['branch'] = $response;
+                $data['title'] = ($response['name'] ?? 'Cabang') . ' - Tirta Bersih Laundry';
+            } elseif (isset($response['success']) && $response['success']) {
+                $data['branch'] = $response['data'] ?? null;
+                if ($data['branch']) {
+                    $data['title'] = ($data['branch']['name'] ?? 'Cabang') . ' - Tirta Bersih Laundry';
+                }
+            } elseif (isset($response['data'])) {
+                $data['branch'] = $response['data'];
+            } elseif (isset($response['message'])) {
+                $data['error'] = $response['message'];
+            }
+        }
 
-        if (isset($response['success']) && $response['success']) {
-            $data['branch'] = $response['data'] ?? null;
-            $data['title'] = ($data['branch']['name'] ?? 'Detail Cabang') . ' - Tapak Bersih';
-        } else {
-            $data['error'] = $response['message'] ?? 'Cabang tidak ditemukan';
+        if (!$data['branch']) {
+            $data['error'] = 'Cabang tidak ditemukan';
         }
 
         return view('catalog/branches/detail', $data);

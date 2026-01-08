@@ -2,159 +2,107 @@
 
 <?= $this->section('styles') ?>
 <style>
-.gallery-item {
-    cursor: pointer;
-    transition: transform 0.3s ease;
-}
-.gallery-item:hover {
-    transform: scale(1.05);
-}
-.modal-fullscreen-image {
-    max-width: 100%;
-    max-height: 80vh;
-    object-fit: contain;
-}
+    .gallery-item {
+        position: relative;
+        border-radius: 16px;
+        overflow: hidden;
+        cursor: pointer;
+        aspect-ratio: 1;
+    }
+    .gallery-item img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.4s ease;
+    }
+    .gallery-item:hover img {
+        transform: scale(1.1);
+    }
+    .gallery-item .overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-end;
+        padding: 1rem;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    .gallery-item:hover .overlay {
+        opacity: 1;
+    }
+    .gallery-item .overlay i {
+        font-size: 2rem;
+        color: white;
+        margin-bottom: 0.5rem;
+    }
+    .gallery-item .overlay span {
+        color: white;
+        font-size: 0.9rem;
+    }
+    .hero-section {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
 </style>
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
 
-<!-- Page Header -->
-<section class="py-5 text-white" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-    <div class="container text-center">
-        <h1 class="display-4 fw-bold mb-3">Gallery Hasil Kerja</h1>
-        <p class="lead">Lihat transformasi sepatu yang kami tangani</p>
+<!-- Hero Section -->
+<section class="hero-section py-5 text-white text-center">
+    <div class="container">
+        <h1 class="display-4 fw-bold mb-3">
+            <i class="bi bi-images"></i> Gallery
+        </h1>
+        <p class="lead mb-0">Lihat hasil kerja kami dalam merawat sepatu kesayangan Anda</p>
     </div>
 </section>
 
-<!-- Gallery Grid -->
 <section class="py-5">
     <div class="container">
         
-        <?php if ($error): ?>
-            <div class="alert alert-danger">
+        <?php if (!empty($error)): ?>
+            <div class="alert alert-warning text-center">
                 <i class="bi bi-exclamation-triangle"></i> <?= esc($error) ?>
             </div>
         <?php endif; ?>
-        
-        <?php if (empty($galleries)): ?>
-            <div class="text-center py-5">
-                <i class="bi bi-images display-1 text-muted"></i>
-                <h3 class="mt-3">Belum Ada Gallery</h3>
-                <p class="text-muted">Gallery hasil kerja kami akan segera ditampilkan</p>
-            </div>
-        <?php else: ?>
-            
-            <div class="row mb-4">
-                <div class="col">
-                    <p class="text-muted mb-0">
-                        Menampilkan <strong><?= count($galleries) ?></strong> hasil pekerjaan
-                    </p>
-                </div>
-            </div>
-            
-            <div class="row g-4">
-                <?php foreach ($galleries as $index => $gallery): ?>
-                    <div class="col-md-6 col-lg-4">
-                        <div class="card shadow-sm h-100">
-                            <!-- Before/After Images -->
-                            <div class="row g-0 gallery-item" 
-                                 data-bs-toggle="modal" 
-                                 data-bs-target="#galleryModal<?= $gallery['id'] ?>">
-                                <div class="col-6 position-relative">
-                                    <img src="<?= esc($gallery['before_image']) ?>" 
-                                         class="img-fluid w-100" 
-                                         style="height: 200px; object-fit: cover;" 
-                                         alt="Before">
-                                    <span class="badge bg-dark position-absolute top-0 start-0 m-2">
-                                        Before
-                                    </span>
-                                </div>
-                                <div class="col-6 position-relative">
-                                    <img src="<?= esc($gallery['after_image']) ?>" 
-                                         class="img-fluid w-100" 
-                                         style="height: 200px; object-fit: cover;" 
-                                         alt="After">
-                                    <span class="badge bg-success position-absolute top-0 end-0 m-2">
-                                        After
-                                    </span>
-                                </div>
-                            </div>
-                            
-                            <!-- Description -->
-                            <div class="card-body">
-                                <p class="card-text text-muted mb-2">
-                                    <?= esc($gallery['description']) ?>
-                                </p>
-                                
-                                <?php if (isset($gallery['service'])): ?>
-                                    <div class="mt-2">
-                                        <a href="<?= base_url('services/' . $gallery['service']['id']) ?>" 
-                                           class="badge bg-primary text-decoration-none">
-                                            <?= esc($gallery['service']['name']) ?>
-                                        </a>
-                                    </div>
-                                <?php endif; ?>
-                            </div>
-                            
-                            <!-- Card Footer -->
-                            <div class="card-footer bg-transparent">
-                                <button class="btn btn-sm btn-outline-primary w-100" 
-                                        data-bs-toggle="modal" 
-                                        data-bs-target="#galleryModal<?= $gallery['id'] ?>">
-                                    <i class="bi bi-zoom-in"></i> Lihat Detail
-                                </button>
-                            </div>
-                        </div>
-                    </div>
 
-                    <!-- Modal for Each Gallery Item -->
-                    <div class="modal fade" id="galleryModal<?= $gallery['id'] ?>" tabindex="-1">
-                        <div class="modal-dialog modal-xl modal-dialog-centered">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title">Detail Gallery</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <div class="row g-4">
-                                        <div class="col-md-6 text-center">
-                                            <h6 class="fw-bold mb-3">Before</h6>
-                                            <img src="<?= esc($gallery['before_image']) ?>" 
-                                                 class="modal-fullscreen-image rounded" 
-                                                 alt="Before">
-                                        </div>
-                                        <div class="col-md-6 text-center">
-                                            <h6 class="fw-bold mb-3">After</h6>
-                                            <img src="<?= esc($gallery['after_image']) ?>" 
-                                                 class="modal-fullscreen-image rounded" 
-                                                 alt="After">
-                                        </div>
-                                    </div>
-                                    
-                                    <?php if ($gallery['description']): ?>
-                                        <div class="mt-4">
-                                            <h6 class="fw-bold">Deskripsi:</h6>
-                                            <p class="text-muted"><?= esc($gallery['description']) ?></p>
-                                        </div>
-                                    <?php endif; ?>
-                                    
-                                    <?php if (isset($gallery['service'])): ?>
-                                        <div class="mt-3">
-                                            <h6 class="fw-bold">Layanan:</h6>
-                                            <a href="<?= base_url('services/' . $gallery['service']['id']) ?>" 
-                                               class="btn btn-primary">
-                                                Lihat Layanan: <?= esc($gallery['service']['name']) ?>
-                                            </a>
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
+        <?php if (!empty($gallery)): ?>
+            <div class="row g-4">
+                <?php foreach ($gallery as $item): ?>
+                    <?php if (!is_array($item) || !isset($item['id'])) continue; ?>
+                    <div class="col-6 col-md-4 col-lg-3">
+                        <div class="gallery-item shadow" 
+                             data-bs-toggle="modal" 
+                             data-bs-target="#imageModal" 
+                             onclick="showImage('<?= esc($item['image_url'] ?? $item['image'] ?? '') ?>', '<?= esc($item['title'] ?? $item['caption'] ?? '') ?>')">
+                            <img src="<?= esc($item['image_url'] ?? $item['image'] ?? 'https://via.placeholder.com/400x400?text=No+Image') ?>" 
+                                 alt="<?= esc($item['title'] ?? $item['caption'] ?? 'Gallery Image') ?>"
+                                 loading="lazy">
+                            <div class="overlay">
+                                <i class="bi bi-zoom-in"></i>
+                                <?php if (!empty($item['title']) || !empty($item['caption'])): ?>
+                                    <span><?= esc($item['title'] ?? $item['caption']) ?></span>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
                 <?php endforeach; ?>
             </div>
-            
+        <?php else: ?>
+            <div class="text-center py-5">
+                <i class="bi bi-images fs-1 text-muted mb-3 d-block"></i>
+                <h4 class="text-muted">Gallery Belum Tersedia</h4>
+                <p class="text-muted">Foto-foto hasil pekerjaan akan segera ditampilkan</p>
+                <a href="<?= base_url() ?>" class="btn btn-primary">
+                    <i class="bi bi-house"></i> Kembali ke Beranda
+                </a>
+            </div>
         <?php endif; ?>
     </div>
 </section>
@@ -162,12 +110,36 @@
 <!-- CTA Section -->
 <section class="py-5 bg-light">
     <div class="container text-center">
-        <h2 class="fw-bold mb-3">Ingin Sepatu Anda Sebersih Ini?</h2>
-        <p class="lead text-muted mb-4">Percayakan pada ahlinya</p>
+        <h3 class="fw-bold mb-3">Ingin Sepatu Anda Seperti Ini?</h3>
+        <p class="text-muted mb-4">Pesan layanan kami sekarang dan lihat transformasinya</p>
         <a href="<?= base_url('order/create') ?>" class="btn btn-primary btn-lg">
-            <i class="bi bi-bag-plus"></i> Pesan Sekarang
+            <i class="bi bi-cart-plus"></i> Pesan Sekarang
         </a>
     </div>
 </section>
 
+<!-- Image Modal -->
+<div class="modal fade" id="imageModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content bg-dark border-0">
+            <div class="modal-header border-0">
+                <h5 class="modal-title text-white" id="imageModalTitle"></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center p-0">
+                <img src="" id="modalImage" class="img-fluid" style="max-height: 80vh; border-radius: 0 0 8px 8px;">
+            </div>
+        </div>
+    </div>
+</div>
+
+<?= $this->endSection() ?>
+
+<?= $this->section('scripts') ?>
+<script>
+function showImage(url, title) {
+    document.getElementById('modalImage').src = url || 'https://via.placeholder.com/800x600?text=No+Image';
+    document.getElementById('imageModalTitle').textContent = title || 'Gallery Image';
+}
+</script>
 <?= $this->endSection() ?>

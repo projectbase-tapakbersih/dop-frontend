@@ -20,26 +20,63 @@ class CheckoutController extends BaseController
             'title' => 'Buat Pesanan - Tapak Bersih',
             'services' => [],
             'branches' => [],
-            'error' => null
+            'error' => null,
+            'selected_service' => null,
+            'selected_branch' => null
         ];
 
-        // Get services
+        // Get services - API: GET /api/services
         $servicesResponse = api_request('/services', 'GET');
         if (isset($servicesResponse['success']) && $servicesResponse['success']) {
             $data['services'] = $servicesResponse['data'] ?? [];
+        } elseif (is_array($servicesResponse) && isset($servicesResponse[0])) {
+            $data['services'] = $servicesResponse;
+        } else {
+            $data['error'] = 'Gagal memuat layanan. Silakan refresh halaman.';
         }
 
-        // Get active branches
+        // Get active branches - API: GET /api/branches/active
         $branchesResponse = api_request('/branches/active', 'GET');
         if (isset($branchesResponse['success']) && $branchesResponse['success']) {
             $data['branches'] = $branchesResponse['data'] ?? [];
+        } elseif (is_array($branchesResponse) && isset($branchesResponse[0])) {
+            $data['branches'] = $branchesResponse;
+        }
+
+        // Pre-select service if passed via query param
+        $serviceId = $this->request->getGet('service');
+        if ($serviceId && !empty($data['services'])) {
+            foreach ($data['services'] as $service) {
+                if ($service['id'] == $serviceId) {
+                    $data['selected_service'] = $service;
+                    break;
+                }
+            }
+        }
+
+        // Pre-select branch if passed via query param
+        $branchId = $this->request->getGet('branch');
+        if ($branchId && !empty($data['branches'])) {
+            foreach ($data['branches'] as $branch) {
+                if ($branch['id'] == $branchId) {
+                    $data['selected_branch'] = $branch;
+                    break;
+                }
+            }
         }
 
         // Check if user is logged in or guest
-        if (is_logged_in()) {
-            $data['user'] = get_user_data();
-        } elseif (is_guest()) {
-            $data['user'] = get_user_data();
+        if (function_exists('is_logged_in') && is_logged_in()) {
+            $userData = function_exists('get_user_data') ? get_user_data() : null;
+            $data['user'] = is_array($userData) ? $userData : null;
+            $data['is_guest'] = false;
+        } elseif (function_exists('is_guest') && is_guest()) {
+            $userData = function_exists('get_user_data') ? get_user_data() : null;
+            $data['user'] = is_array($userData) ? $userData : null;
+            $data['is_guest'] = true;
+        } else {
+            $data['user'] = null;
+            $data['is_guest'] = false;
         }
 
         return view('order/create', $data);
@@ -47,21 +84,28 @@ class CheckoutController extends BaseController
 
     /**
      * Process Checkout for Authenticated Users
-     * API: POST /api/checkout
+     * POST /order/checkout
+     * API: POST /api/user/checkout
      */
     public function processCheckout()
     {
+        // Double check login status
         if (!is_logged_in()) {
             return $this->response->setJSON([
                 'success' => false,
-                'message' => 'Anda harus login terlebih dahulu'
+                'message' => 'Anda harus login terlebih dahulu',
+                'require_login' => true,
+                'redirect' => base_url('auth/login')
             ]);
         }
 
+        // Validation
         $rules = [
+            'name' => 'required|min_length[3]',
+            'phone' => 'required|min_length[10]',
             'service_id' => 'required|numeric',
             'branch_id' => 'required|numeric',
-            'pickup_address' => 'required',
+            'pickup_address' => 'required|min_length[10]',
             'pickup_date' => 'required',
             'pickup_time' => 'required',
             'plastic_bag_confirmed' => 'required',
@@ -77,35 +121,45 @@ class CheckoutController extends BaseController
             ]);
         }
 
-        // Prepare checkout data
+        // Prepare checkout data sesuai format API
         $data = [
-            'service_id' => $this->request->getPost('service_id'),
-            'branch_id' => $this->request->getPost('branch_id'),
+            'guest_name' => $this->request->getPost('name'),
+            'guest_phone' => $this->request->getPost('phone'),
+            'branch_id' => (int) $this->request->getPost('branch_id'),
             'pickup_address' => $this->request->getPost('pickup_address'),
-            'pickup_latitude' => $this->request->getPost('pickup_latitude'),
-            'pickup_longitude' => $this->request->getPost('pickup_longitude'),
+            'pickup_latitude' => $this->request->getPost('pickup_latitude') ?: -7.2575,
+            'pickup_longitude' => $this->request->getPost('pickup_longitude') ?: 112.7521,
             'pickup_date' => $this->request->getPost('pickup_date'),
             'pickup_time' => $this->request->getPost('pickup_time'),
-            'plastic_bag_confirmed' => $this->request->getPost('plastic_bag_confirmed') === 'true',
-            'shoe_type' => $this->request->getPost('shoe_type'),
-            'shoe_size' => $this->request->getPost('shoe_size'),
-            'special_notes' => $this->request->getPost('special_notes'),
-            'payment_method' => $this->request->getPost('payment_method')
+            'plastic_bag_confirmed' => $this->request->getPost('plastic_bag_confirmed') === 'true' || $this->request->getPost('plastic_bag_confirmed') === '1',
+            'payment_method' => $this->request->getPost('payment_method'),
+            'items' => [
+                [
+                    'service_id' => (int) $this->request->getPost('service_id'),
+                    'shoe_type' => $this->request->getPost('shoe_type'),
+                    'shoe_size' => $this->request->getPost('shoe_size') ?: null,
+                    'special_notes' => $this->request->getPost('special_notes') ?: null,
+                    'quantity' => 1
+                ]
+            ]
         ];
 
-        // Call API with authentication
-        $response = api_request('/checkout', 'POST', $data, true);
+        log_message('info', 'User Checkout Request: ' . json_encode($data));
 
-        log_message('info', 'Checkout Response: ' . json_encode($response));
+        // API: POST /api/user/checkout
+        $response = api_request('/user/checkout', 'POST', $data, true);
+
+        log_message('info', 'User Checkout Response: ' . json_encode($response));
 
         if (isset($response['success']) && $response['success']) {
-            $orderNumber = $response['data']['order_number'] ?? null;
+            $orderData = $response['data'] ?? [];
+            $orderNumber = is_array($orderData) ? ($orderData['order_number'] ?? null) : null;
             
             return $this->response->setJSON([
                 'success' => true,
                 'message' => 'Pesanan berhasil dibuat!',
-                'data' => $response['data'],
-                'redirect' => base_url('order/detail/' . $orderNumber)
+                'data' => $orderData,
+                'redirect' => base_url('user/orders/' . $orderNumber)
             ]);
         }
 
@@ -118,15 +172,22 @@ class CheckoutController extends BaseController
 
     /**
      * Process Guest Checkout
-     * API: POST /api/guest/checkout
+     * POST /order/guest-checkout
+     * API: POST /api/guest/orders
      */
     public function processGuestCheckout()
     {
         $rules = [
             'name' => 'required|min_length[3]',
-            'phone' => 'required|numeric|min_length[10]',
+            'phone' => 'required|min_length[10]',
             'service_id' => 'required|numeric',
-            'branch_id' => 'required|numeric'
+            'branch_id' => 'required|numeric',
+            'pickup_address' => 'required|min_length[10]',
+            'pickup_date' => 'required',
+            'pickup_time' => 'required',
+            'shoe_type' => 'required',
+            'plastic_bag_confirmed' => 'required',
+            'payment_method' => 'required'
         ];
 
         if (!$this->validate($rules)) {
@@ -137,28 +198,48 @@ class CheckoutController extends BaseController
             ]);
         }
 
-        // Simple guest checkout data (sesuai dokumentasi API)
+        // Prepare guest checkout data
         $data = [
-            'name' => $this->request->getPost('name'),
-            'phone' => $this->request->getPost('phone'),
-            'service_id' => $this->request->getPost('service_id'),
-            'branch_id' => $this->request->getPost('branch_id')
+            'guest_name' => $this->request->getPost('name'),
+            'guest_phone' => $this->request->getPost('phone'),
+            'branch_id' => (int) $this->request->getPost('branch_id'),
+            'pickup_address' => $this->request->getPost('pickup_address'),
+            'pickup_latitude' => $this->request->getPost('pickup_latitude') ?: -7.2575,
+            'pickup_longitude' => $this->request->getPost('pickup_longitude') ?: 112.7521,
+            'pickup_date' => $this->request->getPost('pickup_date'),
+            'pickup_time' => $this->request->getPost('pickup_time'),
+            'plastic_bag_confirmed' => $this->request->getPost('plastic_bag_confirmed') === 'true' || $this->request->getPost('plastic_bag_confirmed') === '1',
+            'payment_method' => $this->request->getPost('payment_method'),
+            'items' => [
+                [
+                    'service_id' => (int) $this->request->getPost('service_id'),
+                    'shoe_type' => $this->request->getPost('shoe_type'),
+                    'shoe_size' => $this->request->getPost('shoe_size') ?: null,
+                    'special_notes' => $this->request->getPost('special_notes') ?: null,
+                    'quantity' => 1
+                ]
+            ]
         ];
 
-        $response = api_request('/guest/checkout', 'POST', $data);
+        log_message('info', 'Guest Checkout Request: ' . json_encode($data));
+
+        // API: POST /api/guest/orders
+        $response = api_request('/guest/orders', 'POST', $data);
 
         log_message('info', 'Guest Checkout Response: ' . json_encode($response));
 
         if (isset($response['success']) && $response['success']) {
-            $orderNumber = $response['data']['order_number'] ?? null;
+            $orderData = $response['data'] ?? [];
+            $orderNumber = is_array($orderData) ? ($orderData['order_number'] ?? null) : null;
             
-            // Store order number in session for guest
+            // Store order number in session for guest tracking
             session()->set('guest_order_number', $orderNumber);
+            session()->set('guest_phone', $this->request->getPost('phone'));
             
             return $this->response->setJSON([
                 'success' => true,
                 'message' => 'Pesanan berhasil dibuat!',
-                'data' => $response['data'],
+                'data' => $orderData,
                 'redirect' => base_url('guest/order/' . $orderNumber)
             ]);
         }

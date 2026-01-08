@@ -1,279 +1,110 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Register - Tapak Bersih</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <!-- SweetAlert2 CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
-    <style>
-        body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            padding: 30px 0;
-        }
-        .auth-card {
-            border-radius: 15px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-        }
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-        }
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-        }
-        .form-control:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 0.25rem rgba(102, 126, 234, 0.25);
-        }
-        .is-invalid {
-            border-color: #dc3545;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="row justify-content-center">
-            <div class="col-md-6 col-lg-5">
-                <div class="card auth-card">
-                    <div class="card-body p-5">
-                        <!-- Logo -->
-                        <div class="text-center mb-4">
-                            <h2 class="fw-bold text-primary">👟 Tapak Bersih</h2>
-                            <p class="text-muted">Buat akun baru</p>
+<?= $this->extend('layouts/main') ?>
+
+<?= $this->section('content') ?>
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-lg border-0" style="border-radius: 16px;">
+                <div class="card-body p-5">
+                    <div class="text-center mb-4">
+                        <i class="bi bi-person-plus text-primary" style="font-size: 4rem;"></i>
+                        <h3 class="fw-bold mt-3">Buat Akun Baru</h3>
+                        <p class="text-muted">Daftar untuk menikmati layanan Tapak Bersih</p>
+                    </div>
+
+                    <?php if (session()->getFlashdata('error')): ?>
+                        <div class="alert alert-danger alert-dismissible fade show">
+                            <i class="bi bi-exclamation-circle"></i> <?= session()->getFlashdata('error') ?>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if (session()->getFlashdata('success')): ?>
+                        <div class="alert alert-success alert-dismissible fade show">
+                            <i class="bi bi-check-circle"></i> <?= session()->getFlashdata('success') ?>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    <?php endif; ?>
+
+                    <!-- Form action ke /auth/register (POST) -->
+                    <form action="<?= base_url('auth/register') ?>" method="POST">
+                        <?= csrf_field() ?>
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Nama Lengkap</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-person"></i></span>
+                                <input type="text" class="form-control" name="name" 
+                                       value="<?= old('name') ?>" 
+                                       placeholder="Nama lengkap Anda" required>
+                            </div>
                         </div>
 
-                        <!-- Register Form -->
-                        <form id="registerForm">
-                            <?= csrf_field() ?>
-                            
-                            <div class="mb-3">
-                                <label class="form-label">Nama Lengkap *</label>
-                                <div class="input-group">
-                                    <span class="input-group-text"><i class="bi bi-person"></i></span>
-                                    <input type="text" class="form-control" name="name" id="name" placeholder="Masukkan nama lengkap" required>
-                                </div>
-                                <div class="invalid-feedback" id="error-name"></div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Email</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                                <input type="email" class="form-control" name="email" 
+                                       value="<?= old('email') ?>" 
+                                       placeholder="nama@email.com" required>
                             </div>
+                        </div>
 
-                            <div class="mb-3">
-                                <label class="form-label">Email *</label>
-                                <div class="input-group">
-                                    <span class="input-group-text"><i class="bi bi-envelope"></i></span>
-                                    <input type="email" class="form-control" name="email" id="email" placeholder="email@example.com" required>
-                                </div>
-                                <div class="invalid-feedback" id="error-email"></div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Nomor HP</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-phone"></i></span>
+                                <input type="tel" class="form-control" name="phone" 
+                                       value="<?= old('phone') ?>" 
+                                       placeholder="08123456789" required>
                             </div>
+                        </div>
 
-                            <div class="mb-3">
-                                <label class="form-label">No. WhatsApp *</label>
-                                <div class="input-group">
-                                    <span class="input-group-text"><i class="bi bi-phone"></i></span>
-                                    <input type="tel" class="form-control" name="phone" id="phone" placeholder="08123456789" required>
-                                </div>
-                                <small class="text-muted">Untuk notifikasi status pesanan</small>
-                                <div class="invalid-feedback" id="error-phone"></div>
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label">Password *</label>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Password</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="bi bi-lock"></i></span>
-                                    <input type="password" class="form-control" name="password" id="password" placeholder="••••••••" required>
-                                    <button class="btn btn-outline-secondary" type="button" id="togglePassword">
-                                        <i class="bi bi-eye"></i>
-                                    </button>
+                                    <input type="password" class="form-control" name="password" 
+                                           placeholder="Min. 8 karakter" required minlength="8">
                                 </div>
-                                <small class="text-muted">Minimal 6 karakter</small>
-                                <div class="invalid-feedback" id="error-password"></div>
                             </div>
-
-                            <div class="mb-3">
-                                <label class="form-label">Konfirmasi Password *</label>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Konfirmasi Password</label>
                                 <div class="input-group">
                                     <span class="input-group-text"><i class="bi bi-lock-fill"></i></span>
-                                    <input type="password" class="form-control" name="password_confirmation" id="password_confirmation" placeholder="••••••••" required>
-                                    <button class="btn btn-outline-secondary" type="button" id="togglePasswordConfirmation">
-                                        <i class="bi bi-eye"></i>
-                                    </button>
+                                    <input type="password" class="form-control" name="password_confirmation" 
+                                           placeholder="Ulangi password" required>
                                 </div>
-                                <div class="invalid-feedback" id="error-password_confirmation"></div>
                             </div>
+                        </div>
 
-                            <div class="mb-3 form-check">
-                                <input type="checkbox" class="form-check-input" id="terms" required>
-                                <label class="form-check-label" for="terms">
-                                    Saya setuju dengan <a href="#" class="text-primary">Syarat & Ketentuan</a>
-                                </label>
-                            </div>
+                        <div class="form-check mb-4">
+                            <input class="form-check-input" type="checkbox" id="agreeTerms" required>
+                            <label class="form-check-label" for="agreeTerms">
+                                Saya setuju dengan <a href="#" class="text-decoration-none">Syarat & Ketentuan</a>
+                            </label>
+                        </div>
 
-                            <button type="submit" class="btn btn-primary w-100 mb-3" id="btnRegister">
-                                <span id="btnText">Daftar</span>
-                                <span id="btnLoading" class="d-none">
-                                    <span class="spinner-border spinner-border-sm me-2"></span>Loading...
-                                </span>
+                        <div class="d-grid mb-3">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-person-plus"></i> Daftar
                             </button>
-                        </form>
+                        </div>
 
-                        <!-- Login Link -->
                         <div class="text-center">
-                            <span class="text-muted">Sudah punya akun? </span>
-                            <a href="<?= base_url('auth/login') ?>" class="text-primary fw-bold">Masuk</a>
+                            <p class="mb-0">Sudah punya akun? 
+                                <a href="<?= base_url('auth/login') ?>" class="text-decoration-none fw-bold">
+                                    Masuk di sini
+                                </a>
+                            </p>
                         </div>
-
-                        <!-- Back to Home -->
-                        <div class="text-center mt-3">
-                            <a href="<?= base_url('/') ?>" class="text-muted"><i class="bi bi-arrow-left"></i> Kembali ke Beranda</a>
-                        </div>
-                    </div>
+                    </form>
                 </div>
             </div>
         </div>
     </div>
+</div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <!-- SweetAlert2 JS -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script>
-        const BASE_URL = '<?= base_url() ?>';
-
-        // Clear all validation errors
-        function clearErrors() {
-            document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
-            document.querySelectorAll('.invalid-feedback').forEach(el => {
-                el.textContent = '';
-                el.style.display = 'none';
-            });
-        }
-
-        // Show validation errors
-        function showErrors(errors) {
-            clearErrors();
-            for (const [field, messages] of Object.entries(errors)) {
-                const input = document.getElementById(field);
-                const errorDiv = document.getElementById(`error-${field}`);
-                
-                if (input && errorDiv) {
-                    input.classList.add('is-invalid');
-                    errorDiv.textContent = Array.isArray(messages) ? messages[0] : messages;
-                    errorDiv.style.display = 'block';
-                }
-            }
-        }
-
-        // Toggle password visibility
-        document.getElementById('togglePassword').addEventListener('click', function() {
-            const passwordInput = document.getElementById('password');
-            const icon = this.querySelector('i');
-            
-            if (passwordInput.type === 'password') {
-                passwordInput.type = 'text';
-                icon.classList.replace('bi-eye', 'bi-eye-slash');
-            } else {
-                passwordInput.type = 'password';
-                icon.classList.replace('bi-eye-slash', 'bi-eye');
-            }
-        });
-
-        document.getElementById('togglePasswordConfirmation').addEventListener('click', function() {
-            const passwordInput = document.getElementById('password_confirmation');
-            const icon = this.querySelector('i');
-            
-            if (passwordInput.type === 'password') {
-                passwordInput.type = 'text';
-                icon.classList.replace('bi-eye', 'bi-eye-slash');
-            } else {
-                passwordInput.type = 'password';
-                icon.classList.replace('bi-eye-slash', 'bi-eye');
-            }
-        });
-
-        // Register Form Submit
-        document.getElementById('registerForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            clearErrors();
-
-            const btnRegister = document.getElementById('btnRegister');
-            const btnText = document.getElementById('btnText');
-            const btnLoading = document.getElementById('btnLoading');
-
-            // Disable button and show loading
-            btnRegister.disabled = true;
-            btnText.classList.add('d-none');
-            btnLoading.classList.remove('d-none');
-
-            const formData = new FormData(this);
-            const data = Object.fromEntries(formData);
-
-            try {
-                const response = await fetch(`${BASE_URL}/auth/process-register`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: new URLSearchParams(data)
-                });
-
-                const result = await response.json();
-                
-                console.log('Register response:', result); // Debug log
-
-                // Re-enable button
-                btnRegister.disabled = false;
-                btnText.classList.remove('d-none');
-                btnLoading.classList.add('d-none');
-
-                if (result.success) {
-                    // Success SweetAlert
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Berhasil!',
-                        text: result.message || 'Registrasi berhasil! Selamat datang.',
-                        confirmButtonColor: '#667eea',
-                        confirmButtonText: 'OK'
-                    }).then((swalResult) => {
-                        if (swalResult.isConfirmed) {
-                            window.location.href = result.redirect || '<?= base_url('/') ?>';
-                        }
-                    });
-                } else {
-                    // Check if there are validation errors
-                    if (result.errors && Object.keys(result.errors).length > 0) {
-                        showErrors(result.errors);
-                    }
-                    
-                    // Always show SweetAlert with the error message
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Registrasi Gagal',
-                        text: result.message || 'Mohon periksa kembali form Anda',
-                        confirmButtonColor: '#dc3545',
-                        confirmButtonText: 'OK'
-                    });
-                }
-            } catch (error) {
-                console.error('Register error:', error);
-                
-                // Re-enable button
-                btnRegister.disabled = false;
-                btnText.classList.remove('d-none');
-                btnLoading.classList.add('d-none');
-
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Kesalahan Koneksi',
-                    text: 'Terjadi kesalahan saat menghubungi server. Silakan coba lagi.',
-                    confirmButtonColor: '#dc3545',
-                    confirmButtonText: 'OK'
-                });
-            }
-        });
-    </script>
-</body>
-</html>
+<?= $this->endSection() ?>

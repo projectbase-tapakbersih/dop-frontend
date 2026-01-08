@@ -1,202 +1,122 @@
 <?= $this->extend('layouts/main') ?>
 
+<?php
+if (!function_exists('format_rupiah')) {
+    function format_rupiah($number) {
+        return 'Rp ' . number_format((float)$number, 0, ',', '.');
+    }
+}
+?>
+
+<?= $this->section('styles') ?>
+<style>
+    .service-card {
+        border-radius: 16px;
+        transition: all 0.3s ease;
+        border: none;
+        overflow: hidden;
+    }
+    .service-card:hover {
+        transform: translateY(-10px);
+        box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+    }
+    .service-icon {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        margin: 0 auto 1rem;
+    }
+    .price-badge {
+        font-size: 1.5rem;
+        font-weight: 700;
+    }
+    .hero-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+</style>
+<?= $this->endSection() ?>
+
 <?= $this->section('content') ?>
 
-<!-- Page Header -->
-<section class="py-5 text-white" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+<!-- Hero Section -->
+<section class="hero-section py-5 text-white text-center">
     <div class="container">
-        <div class="row align-items-center">
-            <div class="col-md-8">
-                <h1 class="display-4 fw-bold mb-3">Katalog Layanan</h1>
-                <p class="lead mb-0">Pilih layanan terbaik untuk sepatu kesayangan Anda</p>
-            </div>
-            <div class="col-md-4 text-end">
-                <a href="<?= base_url('order/create') ?>" class="btn btn-light btn-lg">
-                    <i class="bi bi-bag-plus"></i> Pesan Sekarang
-                </a>
-            </div>
-        </div>
+        <h1 class="display-4 fw-bold mb-3">
+            <i class="bi bi-tags"></i> Layanan Kami
+        </h1>
+        <p class="lead mb-0">Pilih layanan terbaik untuk sepatu kesayangan Anda</p>
     </div>
 </section>
 
-<!-- Services List -->
 <section class="py-5">
     <div class="container">
         
-        <?php if ($error): ?>
-            <div class="alert alert-danger">
+        <?php if (!empty($error)): ?>
+            <div class="alert alert-warning text-center">
                 <i class="bi bi-exclamation-triangle"></i> <?= esc($error) ?>
             </div>
         <?php endif; ?>
-        
-        <?php if (empty($services)): ?>
-            <div class="text-center py-5">
-                <i class="bi bi-inbox display-1 text-muted"></i>
-                <h3 class="mt-3">Belum Ada Layanan</h3>
-                <p class="text-muted">Silakan cek kembali nanti</p>
-            </div>
-        <?php else: ?>
-            
-            <!-- Filter & Sort (Optional) -->
-            <div class="row mb-4">
-                <div class="col-md-8">
-                    <p class="text-muted mb-0">
-                        Menampilkan <strong><?= count($services) ?></strong> layanan
-                    </p>
-                </div>
-                <div class="col-md-4">
-                    <select class="form-select" id="sortServices">
-                        <option value="">Urutkan Berdasarkan</option>
-                        <option value="price-asc">Harga: Rendah ke Tinggi</option>
-                        <option value="price-desc">Harga: Tinggi ke Rendah</option>
-                        <option value="duration-asc">Durasi: Cepat</option>
-                        <option value="duration-desc">Durasi: Lama</option>
-                    </select>
-                </div>
-            </div>
-            
-            <!-- Services Grid -->
-            <div class="row g-4" id="servicesGrid">
+
+        <?php if (!empty($services)): ?>
+            <div class="row g-4">
                 <?php foreach ($services as $service): ?>
-                    <div class="col-md-6 col-lg-4 service-item" 
-                         data-price="<?= $service['price'] ?>" 
-                         data-duration="<?= $service['duration_hours'] ?>">
-                        <div class="card h-100 shadow-sm">
-                            <!-- Service Badge -->
-                            <div class="position-absolute top-0 end-0 m-3">
-                                <?php if ($service['is_active']): ?>
-                                    <span class="badge bg-success">Tersedia</span>
-                                <?php else: ?>
-                                    <span class="badge bg-secondary">Tidak Tersedia</span>
+                    <?php if (!is_array($service) || !isset($service['id'])) continue; ?>
+                    <div class="col-md-6 col-lg-4">
+                        <div class="card service-card h-100 shadow">
+                            <div class="card-body text-center p-4">
+                                <div class="service-icon bg-primary bg-opacity-10 text-primary">
+                                    <i class="bi bi-droplet"></i>
+                                </div>
+                                <h4 class="card-title fw-bold mb-3"><?= esc($service['name'] ?? 'Service') ?></h4>
+                                <p class="text-muted mb-4"><?= esc($service['description'] ?? 'Layanan premium untuk sepatu Anda') ?></p>
+                                
+                                <div class="price-badge text-primary mb-3">
+                                    <?= format_rupiah($service['price'] ?? 0) ?>
+                                </div>
+                                
+                                <?php if (!empty($service['estimated_duration'])): ?>
+                                    <p class="text-muted small mb-3">
+                                        <i class="bi bi-clock"></i> <?= esc($service['estimated_duration']) ?>
+                                    </p>
                                 <?php endif; ?>
-                            </div>
-                            
-                            <div class="card-body">
-                                <!-- Service Icon -->
-                                <div class="mb-3">
-                                    <div class="bg-primary bg-opacity-10 rounded-circle d-inline-flex p-3">
-                                        <i class="bi bi-stars fs-3 text-primary"></i>
-                                    </div>
-                                </div>
                                 
-                                <!-- Service Name -->
-                                <h4 class="card-title fw-bold mb-3">
-                                    <?= esc($service['name']) ?>
-                                </h4>
-                                
-                                <!-- Service Description -->
-                                <p class="card-text text-muted mb-4">
-                                    <?= esc($service['description']) ?>
-                                </p>
-                                
-                                <!-- Service Info -->
-                                <div class="mb-3">
-                                    <div class="d-flex align-items-center mb-2">
-                                        <i class="bi bi-clock text-primary me-2"></i>
-                                        <span>Estimasi: <strong><?= $service['duration_hours'] ?> Jam</strong></span>
-                                    </div>
-                                    <div class="d-flex align-items-center">
-                                        <i class="bi bi-tag text-primary me-2"></i>
-                                        <span class="price-tag fs-5">
-                                            <?= format_rupiah($service['price']) ?>
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Card Footer -->
-                            <div class="card-footer bg-transparent border-top-0">
-                                <div class="d-grid gap-2">
-                                    <a href="<?= base_url('services/' . $service['id']) ?>" class="btn btn-outline-primary">
-                                        <i class="bi bi-info-circle"></i> Lihat Detail
-                                    </a>
-                                    <?php if ($service['is_active']): ?>
-                                        <a href="<?= base_url('order/create?service=' . $service['id']) ?>" class="btn btn-primary">
-                                            <i class="bi bi-bag-plus"></i> Pesan Layanan Ini
-                                        </a>
-                                    <?php endif; ?>
-                                </div>
+                                <a href="<?= base_url('services/' . $service['id']) ?>" class="btn btn-outline-primary">
+                                    <i class="bi bi-info-circle"></i> Detail
+                                </a>
+                                <a href="<?= base_url('order/create') ?>" class="btn btn-primary">
+                                    <i class="bi bi-cart-plus"></i> Pesan
+                                </a>
                             </div>
                         </div>
                     </div>
                 <?php endforeach; ?>
             </div>
-            
+        <?php else: ?>
+            <div class="text-center py-5">
+                <i class="bi bi-tags fs-1 text-muted mb-3 d-block"></i>
+                <h4 class="text-muted">Layanan Belum Tersedia</h4>
+                <p class="text-muted">Layanan akan segera ditampilkan</p>
+                <a href="<?= base_url() ?>" class="btn btn-primary">
+                    <i class="bi bi-house"></i> Kembali ke Beranda
+                </a>
+            </div>
         <?php endif; ?>
     </div>
 </section>
 
-<!-- Why Choose Us -->
+<!-- CTA Section -->
 <section class="py-5 bg-light">
-    <div class="container">
-        <h2 class="text-center section-title mb-5">Mengapa Memilih Tapak Bersih?</h2>
-        <div class="row g-4">
-            <div class="col-md-3">
-                <div class="text-center">
-                    <i class="bi bi-award-fill text-primary" style="font-size: 3rem;"></i>
-                    <h5 class="mt-3 fw-bold">Profesional</h5>
-                    <p class="text-muted">Tenaga ahli berpengalaman</p>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="text-center">
-                    <i class="bi bi-lightning-charge-fill text-primary" style="font-size: 3rem;"></i>
-                    <h5 class="mt-3 fw-bold">Cepat</h5>
-                    <p class="text-muted">Proses sesuai estimasi</p>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="text-center">
-                    <i class="bi bi-shield-fill-check text-primary" style="font-size: 3rem;"></i>
-                    <h5 class="mt-3 fw-bold">Garansi</h5>
-                    <p class="text-muted">Jaminan hasil memuaskan</p>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="text-center">
-                    <i class="bi bi-wallet2 text-primary" style="font-size: 3rem;"></i>
-                    <h5 class="mt-3 fw-bold">Terjangkau</h5>
-                    <p class="text-muted">Harga kompetitif</p>
-                </div>
-            </div>
-        </div>
+    <div class="container text-center">
+        <h3 class="fw-bold mb-3">Siap Merawat Sepatu Anda?</h3>
+        <p class="text-muted mb-4">Pesan layanan sekarang dan rasakan perbedaannya</p>
+        <a href="<?= base_url('order/create') ?>" class="btn btn-primary btn-lg">
+            <i class="bi bi-cart-plus"></i> Pesan Sekarang
+        </a>
     </div>
 </section>
 
-<?= $this->endSection() ?>
-
-<?= $this->section('scripts') ?>
-<script>
-// Sort Services
-document.getElementById('sortServices').addEventListener('change', function() {
-    const sortValue = this.value;
-    const grid = document.getElementById('servicesGrid');
-    const items = Array.from(grid.getElementsByClassName('service-item'));
-    
-    if (!sortValue) return;
-    
-    items.sort((a, b) => {
-        const priceA = parseFloat(a.dataset.price);
-        const priceB = parseFloat(b.dataset.price);
-        const durationA = parseFloat(a.dataset.duration);
-        const durationB = parseFloat(b.dataset.duration);
-        
-        switch(sortValue) {
-            case 'price-asc':
-                return priceA - priceB;
-            case 'price-desc':
-                return priceB - priceA;
-            case 'duration-asc':
-                return durationA - durationB;
-            case 'duration-desc':
-                return durationB - durationA;
-            default:
-                return 0;
-        }
-    });
-    
-    // Re-append sorted items
-    items.forEach(item => grid.appendChild(item));
-});
-</script>
 <?= $this->endSection() ?>
