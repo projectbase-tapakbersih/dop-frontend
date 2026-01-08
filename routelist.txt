@@ -1,0 +1,65 @@
+php artisan route:list
+
+  GET|HEAD  / ............................................................................................................................................. 
+  POST      _boost/browser-logs ........................................................................................................ boost.browser-logs
+  POST      api/admin/branches .............................................................................................. Master\BranchController@store
+  PUT       api/admin/branches/{branch} .................................................................................... Master\BranchController@update
+  DELETE    api/admin/branches/{branch} ................................................................................... Master\BranchController@destroy
+  PATCH     api/admin/branches/{branch}/activate ......................................................................... Master\BranchController@activate
+  PATCH     api/admin/branches/{branch}/deactivate ..................................................................... Master\BranchController@deactivate
+  PUT       api/admin/gallery/{gallery} ............................................................................ Master\ServiceGalleryController@update
+  DELETE    api/admin/gallery/{gallery} ........................................................................... Master\ServiceGalleryController@destroy
+  PATCH     api/admin/gallery/{gallery}/activate ................................................................. Master\ServiceGalleryController@activate
+  PATCH     api/admin/gallery/{gallery}/deactivate ............................................................. Master\ServiceGalleryController@deactivate
+  GET|HEAD  api/admin/orders .................................................................................................. Admin\OrderController@index
+  GET|HEAD  api/admin/orders/{order_number} .................................................................................... Admin\OrderController@show
+  DELETE    api/admin/orders/{order_number} ................................................................................. Admin\OrderController@destroy
+  PATCH     api/admin/orders/{order_number}/status ..................................................................... Admin\OrderController@updateStatus
+  GET|HEAD  api/admin/promo-codes ......................................................................................... Admin\PromoCodeController@index
+  POST      api/admin/promo-codes ......................................................................................... Admin\PromoCodeController@store
+  GET|HEAD  api/admin/promo-codes/{id} ..................................................................................... Admin\PromoCodeController@show
+  PUT       api/admin/promo-codes/{id} ................................................................................... Admin\PromoCodeController@update
+  DELETE    api/admin/promo-codes/{id} .................................................................................. Admin\PromoCodeController@destroy
+  PATCH     api/admin/promo-codes/{id}/toggle ............................................................................ Admin\PromoCodeController@toggle
+  POST      api/admin/services ............................................................................................. Master\ServiceController@store
+  PUT       api/admin/services/{service} .................................................................................. Master\ServiceController@update
+  DELETE    api/admin/services/{service} ................................................................................. Master\ServiceController@destroy
+  PATCH     api/admin/services/{service}/activate ....................................................................... Master\ServiceController@activate
+  PATCH     api/admin/services/{service}/deactivate ................................................................... Master\ServiceController@deactivate
+  POST      api/admin/services/{service}/gallery .................................................................... Master\ServiceGalleryController@store
+  GET|HEAD  api/admin/users .......................................................................................... Admin\UserManagementController@index
+  POST      api/admin/users .......................................................................................... Admin\UserManagementController@store
+  GET|HEAD  api/admin/users/{id} ...................................................................................... Admin\UserManagementController@show
+  PUT       api/admin/users/{id} .................................................................................... Admin\UserManagementController@update
+  DELETE    api/admin/users/{id} ................................................................................... Admin\UserManagementController@destroy
+  POST      api/auth/login ...................................................................................................... Auth\AuthController@login
+  POST      api/auth/logout .................................................................................................... Auth\AuthController@logout
+  POST      api/auth/register ................................................................................................ Auth\AuthController@register
+  POST      api/auth/request-reset-password ...................................................................... Auth\AuthController@requestResetPassword
+  POST      api/auth/reset-password ..................................................................................... Auth\AuthController@resetPassword
+  POST      api/auth/send-otp ................................................................................................. Auth\AuthController@sendOtp
+  POST      api/auth/verify-otp ............................................................................................. Auth\AuthController@verifyOtp
+  GET|HEAD  api/branches .................................................................................................... Master\BranchController@index
+  GET|HEAD  api/branches/active ............................................................................................. Master\BranchController@index
+  GET|HEAD  api/branches/{branch} ............................................................................................ Master\BranchController@show
+  GET|HEAD  api/gallery ............................................................................................... Master\ServiceGalleryController@all
+  GET|HEAD  api/gallery/{gallery} .................................................................................... Master\ServiceGalleryController@show
+  POST      api/guest/orders .......................................................................................... Guest\GuestCheckoutController@store
+  GET|HEAD  api/guest/orders/{order_number} ............................................................................ Guest\GuestCheckoutController@show
+  POST      api/guest/orders/{order_number}/cancel ................................................................... Guest\GuestCheckoutController@cancel
+  POST      api/payments/midtrans/callback ..................................................................... Payments\MidtransCallbackController@handle
+  POST      api/payments/{order_number} .................................................................................... Payments\PaymentController@pay
+  POST      api/payments/{order_number}/cancel .......................................................................... Payments\PaymentController@cancel
+  GET|HEAD  api/payments/{order_number}/status .......................................................................... Payments\PaymentController@status
+  GET|HEAD  api/services ................................................................................................... Master\ServiceController@index
+  GET|HEAD  api/services/{service} .......................................................................................... Master\ServiceController@show
+  GET|HEAD  api/services/{service}/gallery .......................................................................... Master\ServiceGalleryController@index
+  POST      api/user/checkout ........................................................................................... User\UserCheckoutController@store
+  GET|HEAD  api/user/order/{orderNumber} ................................................................................. User\UserCheckoutController@show
+  POST      api/user/order/{orderNumber}/cancel ........................................................................ User\UserCheckoutController@cancel
+  GET|HEAD  api/user/orders ............................................................................................. User\UserCheckoutController@index
+  GET|HEAD  sanctum/csrf-cookie ......................................................... sanctum.csrf-cookie › Laravel\Sanctum › CsrfCookieController@show
+  GET|HEAD  storage/{path} .................................................................................................................. storage.local
+  GET|HEAD  up ............................................................................................................................................ 
+
+                                                                                                                                        Showing [61] routes

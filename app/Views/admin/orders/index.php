@@ -1,227 +1,165 @@
 <?= $this->extend('layouts/main') ?>
 
-<?= $this->section('styles') ?>
-<style>
-    .status-badge {
-        font-size: 0.85rem;
-        padding: 6px 12px;
-    }
-    .order-row:hover {
-        background-color: #f8f9fa;
-    }
-    .filter-card {
-        border-radius: 10px;
-    }
-</style>
-<?= $this->endSection() ?>
+<?php
+helper('format');
+
+// Status options sesuai API
+$statusOptions = [
+    'waiting_pickup' => 'Menunggu Pickup',
+    'on_the_way_to_workshop' => 'Dalam Perjalanan ke Workshop',
+    'arrived_at_workshop' => 'Tiba di Workshop',
+    'in_process' => 'Sedang Diproses',
+    'cleaning_done' => 'Selesai Dicuci',
+    'on_the_way_to_customer' => 'Dalam Pengiriman',
+    'delivered' => 'Terkirim',
+    'completed' => 'Selesai',
+    'cancelled' => 'Dibatalkan'
+];
+
+function getStatusBadgeClass($status) {
+    $classes = [
+        'pending' => 'bg-warning text-dark',
+        'waiting_pickup' => 'bg-info',
+        'on_the_way_to_workshop' => 'bg-info',
+        'arrived_at_workshop' => 'bg-primary',
+        'in_process' => 'bg-primary',
+        'cleaning_done' => 'bg-success',
+        'on_the_way_to_customer' => 'bg-info',
+        'delivered' => 'bg-success',
+        'completed' => 'bg-success',
+        'cancelled' => 'bg-danger'
+    ];
+    return $classes[$status] ?? 'bg-secondary';
+}
+
+function getStatusLabel($status) {
+    $labels = [
+        'pending' => 'Menunggu',
+        'waiting_pickup' => 'Menunggu Pickup',
+        'on_the_way_to_workshop' => 'Ke Workshop',
+        'arrived_at_workshop' => 'Di Workshop',
+        'in_process' => 'Diproses',
+        'cleaning_done' => 'Selesai Cuci',
+        'on_the_way_to_customer' => 'Dikirim',
+        'delivered' => 'Terkirim',
+        'completed' => 'Selesai',
+        'cancelled' => 'Dibatalkan'
+    ];
+    return $labels[$status] ?? ucfirst(str_replace('_', ' ', $status));
+}
+
+function getPaymentBadgeClass($status) {
+    $classes = [
+        'pending' => 'bg-warning text-dark',
+        'paid' => 'bg-success',
+        'failed' => 'bg-danger',
+        'expired' => 'bg-secondary',
+        'refunded' => 'bg-info'
+    ];
+    return $classes[$status] ?? 'bg-secondary';
+}
+?>
 
 <?= $this->section('content') ?>
 
 <!-- Page Header -->
 <section class="py-4 bg-light">
-    <div class="container">
-        <div class="d-flex justify-content-between align-items-center">
+    <div class="container-fluid px-4">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
             <div>
-                <h2 class="mb-1 fw-bold">
-                    <i class="bi bi-box-seam"></i> Manajemen Pesanan
-                </h2>
-                <p class="text-muted mb-0">Kelola semua pesanan customer</p>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-1">
+                        <li class="breadcrumb-item"><a href="<?= base_url('admin/dashboard') ?>">Dashboard</a></li>
+                        <li class="breadcrumb-item active">Orders</li>
+                    </ol>
+                </nav>
+                <h2 class="mb-0 fw-bold"><i class="bi bi-bag-check"></i> Manajemen Order</h2>
             </div>
-            <a href="<?= base_url('admin/dashboard') ?>" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-left"></i> Dashboard
-            </a>
         </div>
     </div>
 </section>
 
-<!-- Filter & Search -->
-<section class="py-4 bg-white border-bottom">
-    <div class="container">
-        <form method="get" action="<?= base_url('admin/orders') ?>">
-            <div class="row g-3">
-                <div class="col-md-4">
-                    <input type="text" 
-                           class="form-control" 
-                           name="search" 
-                           id="searchOrder" 
-                           placeholder="Cari order number, email, atau HP..."
-                           value="<?= esc($_GET['search'] ?? '') ?>">
-                </div>
-                <div class="col-md-3">
-                    <select class="form-select" name="status" id="filterStatus">
-                        <option value="">Semua Status</option>
-                        <option value="waiting_pickup" <?= ($_GET['status'] ?? '') === 'waiting_pickup' ? 'selected' : '' ?>>Waiting Pickup</option>
-                        <option value="picked_up" <?= ($_GET['status'] ?? '') === 'picked_up' ? 'selected' : '' ?>>Picked Up</option>
-                        <option value="in_process" <?= ($_GET['status'] ?? '') === 'in_process' ? 'selected' : '' ?>>In Process</option>
-                        <option value="ready" <?= ($_GET['status'] ?? '') === 'ready' ? 'selected' : '' ?>>Ready</option>
-                        <option value="on_delivery" <?= ($_GET['status'] ?? '') === 'on_delivery' ? 'selected' : '' ?>>On Delivery</option>
-                        <option value="completed" <?= ($_GET['status'] ?? '') === 'completed' ? 'selected' : '' ?>>Completed</option>
-                        <option value="cancelled" <?= ($_GET['status'] ?? '') === 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <select class="form-select" name="branch" id="filterBranch">
-                        <option value="">Semua Cabang</option>
-                        <?php if (!empty($branches)): ?>
-                            <?php foreach ($branches as $branch): ?>
-                                <option value="<?= $branch['id'] ?>" <?= ($_GET['branch'] ?? '') == $branch['id'] ? 'selected' : '' ?>>
-                                    <?= esc($branch['name']) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="bi bi-filter"></i> Filter
-                    </button>
-                </div>
-            </div>
-        </form>
-    </div>
-</section>
-
-<!-- Orders Table -->
 <section class="py-4">
-    <div class="container">
+    <div class="container-fluid px-4">
         
         <?php if (!empty($error)): ?>
-            <div class="alert alert-danger">
-                <i class="bi bi-exclamation-triangle"></i> <?= esc($error) ?>
-            </div>
+            <div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> <?= esc($error) ?></div>
         <?php endif; ?>
 
-        <?php if (empty($orders)): ?>
-            <div class="card shadow-sm">
-                <div class="card-body text-center py-5">
-                    <i class="bi bi-inbox display-1 text-muted"></i>
-                    <h4 class="mt-3">Tidak Ada Pesanan</h4>
-                    <p class="text-muted">Belum ada pesanan yang masuk</p>
-                </div>
+        <!-- Orders Table -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-list"></i> Daftar Order</h5>
+                <span class="badge bg-primary"><?= count($orders ?? []) ?> Order</span>
             </div>
-        <?php else: ?>
-            
-            <!-- Summary -->
-            <div class="mb-3">
-                <span class="badge bg-secondary px-3 py-2">
-                    Total: <?= $pagination['total'] ?? count($orders) ?> pesanan
-                </span>
-            </div>
-
-            <div class="card shadow-sm">
-                <div class="card-body p-0">
+            <div class="card-body p-0">
+                <?php if (!empty($orders)): ?>
                     <div class="table-responsive">
-                        <table class="table table-hover mb-0" id="ordersTable">
+                        <table class="table table-hover align-middle mb-0">
                             <thead class="table-light">
                                 <tr>
-                                    <th>Order Number</th>
+                                    <th>Order #</th>
                                     <th>Customer</th>
-                                    <th>Layanan</th>
                                     <th>Cabang</th>
-                                    <th>Status Order</th>
-                                    <th>Pembayaran</th>
                                     <th>Total</th>
+                                    <th>Status Order</th>
+                                    <th>Status Bayar</th>
                                     <th>Tanggal</th>
-                                    <th>Aksi</th>
+                                    <th class="text-center">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php foreach ($orders as $order): ?>
-                                    <?php
-                                    // Status config
-                                    $status = $order['order_status'] ?? 'pending';
-                                    $statusConfig = [
-                                        'waiting_pickup' => ['badge' => 'warning', 'label' => 'Waiting Pickup'],
-                                        'picked_up' => ['badge' => 'info', 'label' => 'Picked Up'],
-                                        'in_process' => ['badge' => 'primary', 'label' => 'In Process'],
-                                        'processing' => ['badge' => 'primary', 'label' => 'Processing'],
-                                        'washing' => ['badge' => 'primary', 'label' => 'Washing'],
-                                        'drying' => ['badge' => 'primary', 'label' => 'Drying'],
-                                        'quality_check' => ['badge' => 'info', 'label' => 'Quality Check'],
-                                        'ready' => ['badge' => 'success', 'label' => 'Ready'],
-                                        'on_delivery' => ['badge' => 'info', 'label' => 'On Delivery'],
-                                        'completed' => ['badge' => 'success', 'label' => 'Completed'],
-                                        'delivered' => ['badge' => 'success', 'label' => 'Delivered'],
-                                        'cancelled' => ['badge' => 'danger', 'label' => 'Cancelled'],
-                                        'pending' => ['badge' => 'secondary', 'label' => 'Pending']
-                                    ];
-                                    $currentStatus = $statusConfig[$status] ?? ['badge' => 'secondary', 'label' => ucfirst($status)];
-                                    
-                                    // Payment status
-                                    $paymentStatus = $order['payment_status'] ?? 'pending';
-                                    $paymentBadge = $paymentStatus === 'paid' ? 'success' : 'warning';
-                                    $paymentLabel = $paymentStatus === 'paid' ? 'Lunas' : 'Belum Bayar';
-                                    
-                                    // Get service names
-                                    $serviceNames = '-';
-                                    if (!empty($order['items']) && is_array($order['items'])) {
-                                        $names = [];
-                                        foreach ($order['items'] as $item) {
-                                            if (!empty($item['service']['name'])) {
-                                                $names[] = $item['service']['name'];
-                                            }
-                                        }
-                                        $serviceNames = !empty($names) ? implode(', ', $names) : '-';
-                                    }
-                                    
-                                    // Branch name
-                                    $branchName = $order['branch']['name'] ?? '-';
-                                    
-                                    // Customer info
-                                    $customerEmail = $order['guest_email'] ?? '-';
-                                    $customerPhone = $order['guest_phone'] ?? '';
-                                    
-                                    // Total
-                                    $totalAmount = floatval($order['total_amount'] ?? 0);
-                                    ?>
-                                    <tr class="order-row">
+                                    <tr>
                                         <td>
-                                            <strong class="text-primary"><?= esc($order['order_number'] ?? 'N/A') ?></strong>
+                                            <strong class="text-primary"><?= esc($order['order_number'] ?? '-') ?></strong>
                                         </td>
                                         <td>
-                                            <div><?= esc($customerEmail) ?></div>
-                                            <?php if ($customerPhone): ?>
-                                                <small class="text-muted"><?= esc($customerPhone) ?></small>
+                                            <?php if (isset($order['user'])): ?>
+                                                <div><?= esc($order['user']['name'] ?? '-') ?></div>
+                                                <small class="text-muted"><?= esc($order['user']['phone'] ?? '') ?></small>
+                                            <?php elseif (isset($order['guest_name'])): ?>
+                                                <div><?= esc($order['guest_name']) ?> <span class="badge bg-secondary">Guest</span></div>
+                                                <small class="text-muted"><?= esc($order['guest_phone'] ?? '') ?></small>
+                                            <?php else: ?>
+                                                <span class="text-muted">-</span>
                                             <?php endif; ?>
                                         </td>
                                         <td>
-                                            <small><?= esc($serviceNames) ?></small>
+                                            <?= esc($order['branch']['name'] ?? $order['branch_name'] ?? '-') ?>
                                         </td>
                                         <td>
-                                            <small><?= esc($branchName) ?></small>
+                                            <strong><?= format_rupiah($order['total_amount'] ?? 0) ?></strong>
                                         </td>
                                         <td>
-                                            <span class="badge bg-<?= $currentStatus['badge'] ?> status-badge">
-                                                <?= $currentStatus['label'] ?>
+                                            <span class="badge <?= getStatusBadgeClass($order['order_status'] ?? '') ?>">
+                                                <?= getStatusLabel($order['order_status'] ?? '') ?>
                                             </span>
                                         </td>
                                         <td>
-                                            <span class="badge bg-<?= $paymentBadge ?>">
-                                                <?= $paymentLabel ?>
+                                            <span class="badge <?= getPaymentBadgeClass($order['payment_status'] ?? '') ?>">
+                                                <?= ucfirst($order['payment_status'] ?? 'pending') ?>
                                             </span>
                                         </td>
                                         <td>
-                                            <strong><?= format_rupiah($totalAmount) ?></strong>
+                                            <small><?= format_tanggal($order['created_at'] ?? '') ?></small>
                                         </td>
-                                        <td>
-                                            <small class="text-muted">
-                                                <?= date('d M Y', strtotime($order['created_at'] ?? 'now')) ?>
-                                                <br>
-                                                <?= date('H:i', strtotime($order['created_at'] ?? 'now')) ?>
-                                            </small>
-                                        </td>
-                                        <td>
+                                        <td class="text-center">
                                             <div class="btn-group btn-group-sm">
-                                                <a href="<?= base_url('admin/orders/' . ($order['order_number'] ?? '')) ?>" 
+                                                <a href="<?= base_url('admin/orders/' . ($order['order_number'] ?? $order['id'])) ?>" 
                                                    class="btn btn-outline-primary" title="Detail">
                                                     <i class="bi bi-eye"></i>
                                                 </a>
-                                                <?php if (!in_array($status, ['completed', 'cancelled'])): ?>
-                                                    <button type="button" 
-                                                            class="btn btn-outline-warning" 
-                                                            onclick="openStatusModal('<?= esc($order['order_number']) ?>', '<?= $status ?>')"
-                                                            title="Update Status">
-                                                        <i class="bi bi-pencil"></i>
+                                                <button type="button" class="btn btn-outline-success" 
+                                                        onclick="openStatusModal('<?= esc($order['order_number'] ?? '') ?>', '<?= esc($order['order_status'] ?? '') ?>')"
+                                                        title="Update Status">
+                                                    <i class="bi bi-pencil-square"></i>
+                                                </button>
+                                                <?php if (!in_array($order['order_status'] ?? '', ['completed', 'cancelled'])): ?>
+                                                    <button type="button" class="btn btn-outline-danger" 
+                                                            onclick="cancelOrder('<?= esc($order['order_number'] ?? '') ?>')"
+                                                            title="Batalkan">
+                                                        <i class="bi bi-x-circle"></i>
                                                     </button>
                                                 <?php endif; ?>
                                             </div>
@@ -231,73 +169,51 @@
                             </tbody>
                         </table>
                     </div>
-                </div>
+                <?php else: ?>
+                    <div class="text-center py-5">
+                        <i class="bi bi-inbox fs-1 text-muted mb-3 d-block"></i>
+                        <h5 class="text-muted">Belum Ada Order</h5>
+                    </div>
+                <?php endif; ?>
             </div>
-
-            <!-- Pagination -->
-            <?php if (!empty($pagination) && $pagination['last_page'] > 1): ?>
-                <nav class="mt-4">
-                    <ul class="pagination justify-content-center">
-                        <?php for ($i = 1; $i <= $pagination['last_page']; $i++): ?>
-                            <li class="page-item <?= $i == $pagination['current_page'] ? 'active' : '' ?>">
-                                <a class="page-link" href="?page=<?= $i ?>"><?= $i ?></a>
-                            </li>
-                        <?php endfor; ?>
-                    </ul>
-                </nav>
-            <?php endif; ?>
-
-        <?php endif; ?>
+        </div>
     </div>
 </section>
 
 <!-- Update Status Modal -->
-<div class="modal fade" id="updateStatusModal" tabindex="-1">
+<div class="modal fade" id="statusModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="bi bi-pencil-square"></i> Update Status Pesanan
-                </h5>
+                <h5 class="modal-title"><i class="bi bi-pencil-square"></i> Update Status Pesanan</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <form id="updateStatusForm">
-                    <input type="hidden" id="orderNumberInput">
-                    
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle"></i>
-                        Order: <strong id="orderNumberDisplay"></strong>
-                    </div>
-                    
+            <form id="updateStatusForm">
+                <input type="hidden" id="statusOrderNumber" name="order_number">
+                <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label fw-bold">Status Baru *</label>
-                        <select class="form-select" id="newStatus" required>
+                        <!-- PENTING: name harus "order_status" bukan "status" -->
+                        <select class="form-select" name="order_status" id="newStatus" required>
                             <option value="">-- Pilih Status --</option>
-                            <option value="waiting_pickup">Waiting Pickup</option>
-                            <option value="picked_up">Picked Up</option>
-                            <option value="in_process">In Process</option>
-                            <option value="washing">Washing</option>
-                            <option value="drying">Drying</option>
-                            <option value="quality_check">Quality Check</option>
-                            <option value="ready">Ready</option>
-                            <option value="on_delivery">On Delivery</option>
-                            <option value="completed">Completed</option>
-                            <option value="cancelled">Cancelled</option>
+                            <?php foreach ($statusOptions as $value => $label): ?>
+                                <option value="<?= $value ?>"><?= $label ?></option>
+                            <?php endforeach; ?>
                         </select>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Catatan (Opsional)</label>
-                        <textarea class="form-control" id="statusNotes" rows="3" placeholder="Tambahkan catatan jika diperlukan..."></textarea>
+                        <textarea class="form-control" name="notes" id="statusNotes" rows="3" 
+                                  placeholder="Tambahkan catatan jika diperlukan..."></textarea>
                     </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                <button type="button" class="btn btn-primary" onclick="submitStatusUpdate()" id="btnSubmitStatus">
-                    <i class="bi bi-check-circle"></i> Update Status
-                </button>
-            </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> Update Status
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -311,88 +227,61 @@ const BASE_URL = '<?= base_url() ?>';
 let statusModal;
 
 document.addEventListener('DOMContentLoaded', function() {
-    statusModal = new bootstrap.Modal(document.getElementById('updateStatusModal'));
+    statusModal = new bootstrap.Modal(document.getElementById('statusModal'));
 });
 
+// Open Status Modal
 function openStatusModal(orderNumber, currentStatus) {
-    document.getElementById('orderNumberInput').value = orderNumber;
-    document.getElementById('orderNumberDisplay').textContent = orderNumber;
-    document.getElementById('newStatus').value = '';
+    document.getElementById('statusOrderNumber').value = orderNumber;
+    document.getElementById('newStatus').value = currentStatus;
     document.getElementById('statusNotes').value = '';
-    
-    // Disable current status option
-    const statusSelect = document.getElementById('newStatus');
-    Array.from(statusSelect.options).forEach(option => {
-        option.disabled = (option.value === currentStatus);
-    });
-    
     statusModal.show();
 }
 
-async function submitStatusUpdate() {
-    const orderNumber = document.getElementById('orderNumberInput').value;
-    const newStatus = document.getElementById('newStatus').value;
-    const notes = document.getElementById('statusNotes').value;
+// Update Status Form Submit
+document.getElementById('updateStatusForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
     
-    if (!newStatus) {
-        Swal.fire({
-            icon: 'warning',
-            title: 'Oops!',
-            text: 'Pilih status baru terlebih dahulu'
-        });
-        return;
+    const orderNumber = document.getElementById('statusOrderNumber').value;
+    const formData = new FormData(this);
+    
+    // Debug: lihat apa yang dikirim
+    console.log('Sending data:');
+    for (let [key, value] of formData.entries()) {
+        console.log(key + ': ' + value);
     }
-    
-    // Confirm if cancelling
-    if (newStatus === 'cancelled') {
-        const confirm = await Swal.fire({
-            title: 'Batalkan Pesanan?',
-            text: 'Pesanan yang dibatalkan tidak dapat dikembalikan!',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#dc3545',
-            cancelButtonColor: '#6c757d',
-            confirmButtonText: 'Ya, Batalkan',
-            cancelButtonText: 'Tidak'
-        });
-        
-        if (!confirm.isConfirmed) return;
-    }
-    
-    // Disable button
-    const btn = document.getElementById('btnSubmitStatus');
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Updating...';
     
     try {
+        Swal.fire({
+            title: 'Memproses...',
+            text: 'Sedang mengupdate status order',
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading()
+        });
+        
         const response = await fetch(`${BASE_URL}/admin/orders/${orderNumber}/status`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: JSON.stringify({ 
-                status: newStatus, 
-                notes: notes 
-            })
+            body: new URLSearchParams(formData)
         });
         
         const result = await response.json();
+        console.log('Response:', result);
         
         if (result.success) {
-            statusModal.hide();
             Swal.fire({
                 icon: 'success',
                 title: 'Berhasil!',
-                text: result.message || 'Status berhasil diupdate'
+                text: result.message,
+                timer: 1500
             }).then(() => {
+                statusModal.hide();
                 window.location.reload();
             });
         } else {
             Swal.fire({
                 icon: 'error',
                 title: 'Gagal!',
-                text: result.message || 'Gagal update status'
+                text: result.message
             });
         }
     } catch (error) {
@@ -400,23 +289,60 @@ async function submitStatusUpdate() {
         Swal.fire({
             icon: 'error',
             title: 'Error!',
-            text: 'Terjadi kesalahan saat update status'
+            text: 'Terjadi kesalahan saat menghubungi server'
         });
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-check-circle"></i> Update Status';
+    }
+});
+
+// Cancel Order
+async function cancelOrder(orderNumber) {
+    const result = await Swal.fire({
+        title: 'Batalkan Order?',
+        html: `Anda yakin ingin membatalkan order <strong>${orderNumber}</strong>?<br><br>Tindakan ini tidak dapat dibatalkan.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        confirmButtonText: 'Ya, Batalkan',
+        cancelButtonText: 'Tidak'
+    });
+    
+    if (!result.isConfirmed) return;
+    
+    try {
+        Swal.fire({
+            title: 'Memproses...',
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading()
+        });
+        
+        const response = await fetch(`${BASE_URL}/admin/orders/${orderNumber}/cancel`, {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Berhasil!',
+                text: data.message,
+                timer: 1500
+            }).then(() => window.location.reload());
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Gagal!',
+                text: data.message
+            });
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Error!',
+            text: 'Terjadi kesalahan'
+        });
     }
 }
-
-// Client-side search filter
-document.getElementById('searchOrder')?.addEventListener('input', function() {
-    const searchTerm = this.value.toLowerCase();
-    const rows = document.querySelectorAll('#ordersTable tbody tr');
-    
-    rows.forEach(row => {
-        const text = row.textContent.toLowerCase();
-        row.style.display = text.includes(searchTerm) ? '' : 'none';
-    });
-});
 </script>
 <?= $this->endSection() ?>

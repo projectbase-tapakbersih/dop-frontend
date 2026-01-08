@@ -1,450 +1,278 @@
-// Order Form Logic
-const BASE_URL = window.location.origin;
+// Order Form Handler
 let currentStep = 1;
-let selectedService = null;
-let selectedBranch = null;
+let selectedServiceData = null;
+let selectedBranchData = null;
 
-// Check if user is logged in (will be set from PHP)
-const isUserLoggedIn = typeof USER_LOGGED_IN !== 'undefined' ? USER_LOGGED_IN : false;
-
-// Initialize
 document.addEventListener('DOMContentLoaded', function() {
-    // Set minimum date to today
-    const today = new Date().toISOString().split('T')[0];
-    const pickupDateEl = document.getElementById('pickup_date');
-    if (pickupDateEl) {
-        pickupDateEl.setAttribute('min', today);
-    }
-    
-    // Initialize service selection
-    initServiceSelection();
-    initBranchSelection();
-    initFormValidation();
-    
-    // Update summary on form changes
-    document.querySelectorAll('#orderForm input, #orderForm select, #orderForm textarea').forEach(input => {
-        input.addEventListener('change', updateOrderSummary);
-        input.addEventListener('input', updateOrderSummary);
-    });
-
-    // Initialize pre-selected service
-    const preSelectedService = document.querySelector('.service-option.selected');
-    if (preSelectedService) {
-        selectedService = {
-            id: preSelectedService.dataset.serviceId,
-            name: preSelectedService.dataset.serviceName,
-            price: parseFloat(preSelectedService.dataset.servicePrice),
-            duration: preSelectedService.dataset.serviceDuration
-        };
-        updateOrderSummary();
-    }
+  initializeForm();
+  attachEventListeners();
 });
 
-// =====================
-// STEP NAVIGATION
-// =====================
-function nextStep(step) {
-    if (validateCurrentStep()) {
-        // Hide current step
-        document.getElementById(`formStep${currentStep}`).classList.add('d-none');
-        document.getElementById(`step${currentStep}`).classList.remove('active');
-        document.getElementById(`step${currentStep}`).classList.add('completed');
-        
-        // Show next step
-        currentStep = step;
-        document.getElementById(`formStep${step}`).classList.remove('d-none');
-        document.getElementById(`step${step}`).classList.add('active');
-        
-        // Update summary
-        updateOrderSummary();
-        
-        // Scroll to top
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+function initializeForm() {
+  const selectedService = document.querySelector('input[name="service_id"]:checked');
+  if (selectedService) {
+    const serviceOption = selectedService.closest('.service-option');
+    if (serviceOption) {
+      selectedServiceData = {
+        id: serviceOption.dataset.serviceId,
+        name: serviceOption.dataset.serviceName,
+        price: serviceOption.dataset.servicePrice,
+        duration: serviceOption.dataset.serviceDuration
+      };
+      updateSummary();
     }
+  }
+}
+
+function attachEventListeners() {
+  document.querySelectorAll('.service-option').forEach(option => {
+    option.addEventListener('click', function() {
+      document.querySelectorAll('.service-option').forEach(o => o.classList.remove('selected'));
+      this.classList.add('selected');
+
+      const radio = this.querySelector('input[type="radio"]');
+      if (radio) radio.checked = true;
+
+      selectedServiceData = {
+        id: this.dataset.serviceId,
+        name: this.dataset.serviceName,
+        price: this.dataset.servicePrice,
+        duration: this.dataset.serviceDuration
+      };
+      updateSummary();
+    });
+  });
+
+  document.querySelectorAll('.branch-option').forEach(option => {
+    option.addEventListener('click', function() {
+      document.querySelectorAll('.branch-option').forEach(o => o.classList.remove('selected'));
+      this.classList.add('selected');
+
+      const radio = this.querySelector('input[type="radio"]');
+      if (radio) radio.checked = true;
+
+      selectedBranchData = { id: this.dataset.branchId };
+    });
+  });
+
+  const form = document.getElementById('orderForm');
+  if (form) {
+    form.addEventListener('submit', handleFormSubmit);
+  }
+
+  ['shoe_type', 'shoe_size', 'special_notes', 'pickup_address', 'pickup_date', 'pickup_time'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input', updateSummary);
+    el.addEventListener('change', updateSummary);
+  });
+}
+
+// Step Navigation
+function nextStep(step) {
+  if (!validateStep(currentStep)) return;
+
+  document.getElementById(`formStep${currentStep}`).classList.add('d-none');
+  document.getElementById(`step${currentStep}`).classList.remove('active');
+  document.getElementById(`step${currentStep}`).classList.add('completed');
+
+  currentStep = step;
+  document.getElementById(`formStep${step}`).classList.remove('d-none');
+  document.getElementById(`step${step}`).classList.add('active');
+
+  updateSummary();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function prevStep(step) {
-    // Hide current step
-    document.getElementById(`formStep${currentStep}`).classList.add('d-none');
-    document.getElementById(`step${currentStep}`).classList.remove('active');
-    
-    // Show previous step
-    currentStep = step;
-    document.getElementById(`formStep${step}`).classList.remove('d-none');
-    document.getElementById(`step${step}`).classList.add('active');
-    document.getElementById(`step${step}`).classList.remove('completed');
-    
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  document.getElementById(`formStep${currentStep}`).classList.add('d-none');
+  document.getElementById(`step${currentStep}`).classList.remove('active');
+
+  currentStep = step;
+  document.getElementById(`formStep${step}`).classList.remove('d-none');
+  document.getElementById(`step${step}`).classList.add('active');
+  document.getElementById(`step${step}`).classList.remove('completed');
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// =====================
-// VALIDATION
-// =====================
-function validateCurrentStep() {
-    clearErrors();
-    
-    if (currentStep === 1) {
-        const serviceRadio = document.querySelector('input[name="service_id"]:checked');
-        if (!serviceRadio) {
-            showSwalError('Silakan pilih layanan terlebih dahulu');
-            return false;
-        }
-        return true;
+// Validation
+function validateStep(step) {
+  clearErrors();
+
+  switch(step) {
+    case 1: {
+      const serviceId = document.querySelector('input[name="service_id"]:checked');
+      if (!serviceId) return showError('service_id', 'Pilih salah satu layanan');
+      break;
     }
-    
-    if (currentStep === 2) {
-        const shoeType = document.getElementById('shoe_type').value;
-        if (!shoeType) {
-            showError('shoe_type', 'Jenis sepatu wajib dipilih');
-            showSwalError('Jenis sepatu wajib dipilih');
-            return false;
-        }
-        return true;
+    case 2: {
+      const shoeType = document.getElementById('shoe_type');
+      if (!shoeType || !shoeType.value) return showError('shoe_type', 'Jenis sepatu harus dipilih');
+      break;
     }
-    
-    if (currentStep === 3) {
-        const branchId = document.querySelector('input[name="branch_id"]:checked');
-        const pickupAddress = document.getElementById('pickup_address').value;
-        const pickupDate = document.getElementById('pickup_date').value;
-        const pickupTime = document.getElementById('pickup_time').value;
-        
-        let errors = [];
-        
-        if (!branchId) {
-            errors.push('Silakan pilih cabang terlebih dahulu');
-        }
-        if (!pickupAddress) {
-            showError('pickup_address', 'Alamat penjemputan wajib diisi');
-            errors.push('Alamat penjemputan wajib diisi');
-        } else if (pickupAddress.length < 10) {
-            showError('pickup_address', 'Alamat penjemputan minimal 10 karakter');
-            errors.push('Alamat penjemputan minimal 10 karakter');
-        }
-        if (!pickupDate) {
-            showError('pickup_date', 'Tanggal penjemputan wajib dipilih');
-            errors.push('Tanggal penjemputan wajib dipilih');
-        }
-        if (!pickupTime) {
-            showError('pickup_time', 'Waktu penjemputan wajib dipilih');
-            errors.push('Waktu penjemputan wajib dipilih');
-        }
-        
-        if (errors.length > 0) {
-            showSwalError(errors.join('<br>'));
-            return false;
-        }
-        return true;
+    case 3: {
+      const branchId = document.querySelector('input[name="branch_id"]:checked');
+      const pickupAddress = document.getElementById('pickup_address');
+      const pickupDate = document.getElementById('pickup_date');
+      const pickupTime = document.getElementById('pickup_time');
+
+      if (!branchId) return showError('branch_id', 'Pilih cabang terdekat');
+      if (!pickupAddress || pickupAddress.value.length < 10) return showError('pickup_address', 'Alamat penjemputan minimal 10 karakter');
+      if (!pickupDate || !pickupDate.value) return showError('pickup_date', 'Tanggal penjemputan harus diisi');
+      if (!pickupTime || !pickupTime.value) return showError('pickup_time', 'Waktu penjemputan harus diisi');
+
+      const hour = parseInt(pickupTime.value.split(':')[0], 10);
+      if (hour < 8 || hour >= 20) return showError('pickup_time', 'Waktu operasional: 08:00 - 20:00');
+      break;
     }
-    
-    return true;
-}
+    case 4: {
+      const guestName = document.getElementById('guest_name');
+      const guestPhone = document.getElementById('guest_phone');
+      const plasticBag = document.getElementById('plastic_bag_confirmed');
+      const paymentMethod = document.querySelector('input[name="payment_method"]:checked');
 
-// =====================
-// SERVICE SELECTION
-// =====================
-function initServiceSelection() {
-    document.querySelectorAll('.service-option').forEach(option => {
-        option.addEventListener('click', function() {
-            document.querySelectorAll('.service-option').forEach(opt => {
-                opt.classList.remove('selected');
-            });
-            
-            this.classList.add('selected');
-            
-            const radio = this.querySelector('input[type="radio"]');
-            radio.checked = true;
-            
-            selectedService = {
-                id: this.dataset.serviceId,
-                name: this.dataset.serviceName,
-                price: parseFloat(this.dataset.servicePrice),
-                duration: this.dataset.serviceDuration
-            };
-            
-            updateOrderSummary();
-        });
-    });
-}
+      if (!guestName || !guestName.value.trim()) return showError('name', 'Nama lengkap harus diisi');
+      if (!guestPhone || !guestPhone.value.trim()) return showError('phone', 'Nomor HP harus diisi');
 
-// =====================
-// BRANCH SELECTION
-// =====================
-function initBranchSelection() {
-    document.querySelectorAll('.branch-option').forEach(option => {
-        option.addEventListener('click', function() {
-            document.querySelectorAll('.branch-option').forEach(opt => {
-                opt.classList.remove('selected');
-            });
-            
-            this.classList.add('selected');
-            
-            const radio = this.querySelector('input[type="radio"]');
-            radio.checked = true;
-            
-            selectedBranch = {
-                id: this.dataset.branchId
-            };
-        });
-    });
-}
+      const phoneRegex = /^(\+62|62|0)[0-9]{9,12}$/;
+      if (!phoneRegex.test(guestPhone.value.replace(/\s/g, ''))) {
+        return showError('phone', 'Format nomor HP tidak valid (contoh: 081234567890)');
+      }
 
-// =====================
-// ORDER SUMMARY
-// =====================
-function updateOrderSummary() {
-    // Update service info
-    if (selectedService) {
-        document.getElementById('selectedServiceName').textContent = selectedService.name;
-        document.getElementById('selectedServiceDuration').textContent = selectedService.duration + ' Jam';
-        document.getElementById('totalPrice').textContent = formatRupiah(selectedService.price);
+      if (!plasticBag || !plasticBag.checked) return showError('plastic_bag_confirmed', 'Anda harus menyetujui penggunaan kantong plastik');
+      if (!paymentMethod) return showError('payment_method', 'Pilih metode pembayaran');
+      break;
     }
-    
-    // Update shoe details
-    const shoeType = document.getElementById('shoe_type')?.value;
-    const shoeSize = document.getElementById('shoe_size')?.value;
-    const specialNotes = document.getElementById('special_notes')?.value;
-    
-    if (shoeType) {
-        let shoeInfo = `Jenis: ${shoeType}`;
-        if (shoeSize) shoeInfo += `<br>Ukuran: ${shoeSize}`;
-        if (specialNotes) shoeInfo += `<br>Catatan: ${specialNotes.substring(0, 50)}${specialNotes.length > 50 ? '...' : ''}`;
-        document.getElementById('shoeDetails').innerHTML = shoeInfo;
-    }
-    
-    // Update pickup info
-    const pickupDate = document.getElementById('pickup_date')?.value;
-    const pickupTime = document.getElementById('pickup_time')?.value;
-    const pickupAddress = document.getElementById('pickup_address')?.value;
-    
-    if (pickupDate || pickupTime || pickupAddress) {
-        let pickupInfo = '';
-        if (pickupDate) pickupInfo += `Tanggal: ${formatDate(pickupDate)}<br>`;
-        if (pickupTime) pickupInfo += `Waktu: ${pickupTime}<br>`;
-        if (pickupAddress) pickupInfo += `Alamat: ${pickupAddress.substring(0, 40)}${pickupAddress.length > 40 ? '...' : ''}`;
-        document.getElementById('pickupDetails').innerHTML = pickupInfo;
-    }
-}
+  }
 
-// =====================
-// FORM SUBMISSION
-// =====================
-function initFormValidation() {
-    document.getElementById('orderForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        clearErrors();
-        
-        // Validate name and phone (required for all users)
-        const guestName = document.getElementById('guest_name')?.value?.trim();
-        const guestPhone = document.getElementById('guest_phone')?.value?.trim();
-        
-        if (!guestName || guestName.length < 3) {
-            showError('name', 'Nama lengkap wajib diisi (minimal 3 karakter)');
-            showSwalError('Nama lengkap wajib diisi (minimal 3 karakter)');
-            return;
-        }
-        
-        if (!guestPhone || guestPhone.length < 10) {
-            showError('phone', 'Nomor HP wajib diisi (minimal 10 digit)');
-            showSwalError('Nomor HP wajib diisi (minimal 10 digit)');
-            return;
-        }
-        
-        // Validate plastic bag confirmation
-        const plasticBagConfirmed = document.getElementById('plastic_bag_confirmed').checked;
-        if (!plasticBagConfirmed) {
-            showError('plastic_bag_confirmed', 'Anda harus menyetujui penggunaan kantong plastik');
-            showSwalError('Anda harus menyetujui penggunaan kantong plastik');
-            return;
-        }
-        
-        // Validate payment method
-        const paymentMethod = document.querySelector('input[name="payment_method"]:checked');
-        if (!paymentMethod) {
-            showError('payment_method', 'Silakan pilih metode pembayaran');
-            showSwalError('Silakan pilih metode pembayaran');
-            return;
-        }
-        
-        // Show loading
-        setLoadingState(true);
-        
-        // Prepare form data
-        const formData = new FormData(this);
-        
-        // Use appropriate endpoint based on login status
-        const endpoint = isUserLoggedIn ? '/order/checkout' : '/order/guest-checkout';
-        
-        try {
-            const response = await fetch(`${BASE_URL}${endpoint}`, {
-                method: 'POST',
-                body: new URLSearchParams(formData),
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            });
-            
-            const result = await response.json();
-            
-            console.log('Checkout Response:', result); // Debug
-            
-            if (result.success) {
-                // Show success with SweetAlert
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Pesanan Berhasil!',
-                    html: `
-                        <p>${result.message || 'Pesanan Anda telah berhasil dibuat.'}</p>
-                        <div class="alert alert-info mt-3">
-                            <strong>Nomor Pesanan:</strong><br>
-                            <h4 class="text-primary mb-0">${result.data?.order_number || 'N/A'}</h4>
-                        </div>
-                        <small class="text-muted">Simpan nomor pesanan untuk tracking</small>
-                    `,
-                    showCancelButton: true,
-                    confirmButtonText: '<i class="bi bi-eye"></i> Lihat Detail',
-                    cancelButtonText: '<i class="bi bi-house"></i> Ke Beranda',
-                    confirmButtonColor: '#667eea',
-                    cancelButtonColor: '#6c757d',
-                    allowOutsideClick: false
-                }).then((swalResult) => {
-                    if (swalResult.isConfirmed && result.redirect) {
-                        window.location.href = result.redirect;
-                    } else {
-                        window.location.href = BASE_URL;
-                    }
-                });
-                
-            } else {
-                // Handle require login
-                if (result.require_login) {
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Login Diperlukan',
-                        text: result.message || 'Silakan login terlebih dahulu',
-                        showCancelButton: true,
-                        confirmButtonText: 'Login Sekarang',
-                        cancelButtonText: 'Lanjut sebagai Tamu',
-                        confirmButtonColor: '#667eea'
-                    }).then((swalResult) => {
-                        if (swalResult.isConfirmed) {
-                            window.location.href = result.redirect || `${BASE_URL}/auth/login`;
-                        }
-                        // If cancel, user can continue as guest
-                    });
-                    return;
-                }
-                
-                // Handle validation errors
-                if (result.errors) {
-                    showErrors(result.errors);
-                    
-                    // Format error messages for SweetAlert
-                    let errorMessages = [];
-                    for (const [field, messages] of Object.entries(result.errors)) {
-                        const message = Array.isArray(messages) ? messages[0] : messages;
-                        errorMessages.push(`• ${message}`);
-                    }
-                    
-                    showSwalError(errorMessages.join('<br>'), 'Validasi Gagal');
-                } else {
-                    showSwalError(result.message || 'Gagal membuat pesanan');
-                }
-            }
-        } catch (error) {
-            console.error('Order error:', error);
-            showSwalError('Terjadi kesalahan koneksi. Silakan coba lagi.');
-        } finally {
-            setLoadingState(false);
-        }
-    });
-}
-
-// =====================
-// UI HELPERS
-// =====================
-function setLoadingState(loading) {
-    const btnSubmit = document.getElementById('btnSubmit');
-    const btnText = document.getElementById('btnText');
-    const btnLoading = document.getElementById('btnLoading');
-    
-    if (loading) {
-        btnSubmit.disabled = true;
-        btnText.classList.add('d-none');
-        btnLoading.classList.remove('d-none');
-    } else {
-        btnSubmit.disabled = false;
-        btnText.classList.remove('d-none');
-        btnLoading.classList.add('d-none');
-    }
-}
-
-// =====================
-// SWEETALERT HELPERS
-// =====================
-function showSwalError(message, title = 'Oops!') {
-    Swal.fire({
-        icon: 'error',
-        title: title,
-        html: message,
-        confirmButtonColor: '#667eea'
-    });
-}
-
-function showSwalSuccess(message, title = 'Berhasil!') {
-    Swal.fire({
-        icon: 'success',
-        title: title,
-        html: message,
-        confirmButtonColor: '#667eea'
-    });
-}
-
-function showSwalWarning(message, title = 'Perhatian') {
-    Swal.fire({
-        icon: 'warning',
-        title: title,
-        html: message,
-        confirmButtonColor: '#667eea'
-    });
-}
-
-// =====================
-// UTILITY FUNCTIONS
-// =====================
-function formatRupiah(amount) {
-    return new Intl.NumberFormat('id-ID', {
-        style: 'currency',
-        currency: 'IDR',
-        minimumFractionDigits: 0
-    }).format(amount);
-}
-
-function formatDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('id-ID', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    });
-}
-
-function clearErrors() {
-    document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
-    document.querySelectorAll('.invalid-feedback').forEach(el => el.textContent = '');
+  return true;
 }
 
 function showError(fieldName, message) {
-    const field = document.getElementById(fieldName);
-    const errorDiv = document.getElementById(`error-${fieldName}`);
-    
-    if (field) field.classList.add('is-invalid');
-    if (errorDiv) errorDiv.textContent = message;
+  const errorElement = document.getElementById(`error-${fieldName}`);
+  const inputElement = document.getElementById(fieldName) || document.querySelector(`input[name="${fieldName}"]`);
+
+  if (errorElement) {
+    errorElement.textContent = message;
+    errorElement.style.display = 'block';
+  }
+  if (inputElement) inputElement.classList.add('is-invalid');
+
+  Swal.fire({ icon: 'error', title: 'Oops!', text: message, confirmButtonColor: '#667eea' });
+  return false;
 }
 
-function showErrors(errors) {
-    for (const [field, messages] of Object.entries(errors)) {
-        const message = Array.isArray(messages) ? messages[0] : messages;
-        showError(field, message);
+function clearErrors() {
+  document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+  document.querySelectorAll('.invalid-feedback').forEach(el => el.style.display = 'none');
+}
+
+// Update Summary
+function updateSummary() {
+  if (selectedServiceData) {
+    document.getElementById('selectedServiceName').textContent = selectedServiceData.name;
+    document.getElementById('selectedServiceDuration').textContent = `${selectedServiceData.duration} Jam`;
+    document.getElementById('totalPrice').textContent = formatRupiah(selectedServiceData.price);
+  }
+
+  const shoeType = document.getElementById('shoe_type')?.value;
+  const shoeSize = document.getElementById('shoe_size')?.value;
+  const specialNotes = document.getElementById('special_notes')?.value;
+
+  let shoeDetails = 'Belum diisi';
+  if (shoeType) {
+    shoeDetails = `<strong>${shoeType}</strong>`;
+    if (shoeSize) shoeDetails += ` - Ukuran: ${shoeSize}`;
+    if (specialNotes) shoeDetails += `<br><small class="text-muted">${specialNotes.substring(0, 50)}${specialNotes.length > 50 ? '...' : ''}</small>`;
+  }
+  const shoeDetailsEl = document.getElementById('shoeDetails');
+  if (shoeDetailsEl) shoeDetailsEl.innerHTML = shoeDetails;
+
+  const pickupAddress = document.getElementById('pickup_address')?.value;
+  const pickupDate = document.getElementById('pickup_date')?.value;
+  const pickupTime = document.getElementById('pickup_time')?.value;
+
+  let pickupDetails = 'Belum diisi';
+  if (pickupDate && pickupTime) {
+    const dateObj = new Date(pickupDate);
+    const dateStr = dateObj.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    pickupDetails = `<strong>${dateStr}</strong><br>Pukul ${pickupTime}`;
+    if (pickupAddress) pickupDetails += `<br><small class="text-muted">${pickupAddress.substring(0, 50)}${pickupAddress.length > 50 ? '...' : ''}</small>`;
+  }
+  const pickupDetailsEl = document.getElementById('pickupDetails');
+  if (pickupDetailsEl) pickupDetailsEl.innerHTML = pickupDetails;
+}
+
+// Form Submission
+async function handleFormSubmit(e) {
+  e.preventDefault();
+  if (!validateStep(4)) return;
+
+  const form = e.target;
+  const formData = new FormData(form);
+
+  const btnSubmit = document.getElementById('btnSubmit');
+  const btnText = document.getElementById('btnText');
+  const btnLoading = document.getElementById('btnLoading');
+
+  btnSubmit.disabled = true;
+  btnText.classList.add('d-none');
+  btnLoading.classList.remove('d-none');
+
+  try {
+    const endpoint = (typeof USER_LOGGED_IN !== 'undefined' && USER_LOGGED_IN)
+      ? `${BASE_URL}/order/checkout`
+      : `${BASE_URL}/order/guest-checkout`;
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      body: formData
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      await Swal.fire({
+        icon: 'success',
+        title: 'Pesanan Berhasil Dibuat!',
+        text: 'Anda akan diarahkan ke halaman pembayaran...',
+        timer: 1800,
+        showConfirmButton: false
+      });
+
+      const orderNumber = result.data?.order_number || result.order?.order_number || result.order_number;
+      if (orderNumber) {
+        window.location.href = `${BASE_URL}/payment/${encodeURIComponent(orderNumber)}`;
+      } else {
+        window.location.href = result.redirect || `${BASE_URL}/user/orders`;
+      }
+      return;
     }
+
+    let errorMessage = result.message || 'Gagal membuat pesanan';
+    if (result.errors) {
+      const errorMessages = [];
+      for (const [_, messages] of Object.entries(result.errors)) {
+        const msg = Array.isArray(messages) ? messages[0] : messages;
+        errorMessages.push(`• ${msg}`);
+      }
+      errorMessage = errorMessages.join('\n');
+    }
+
+    Swal.fire({ icon: 'error', title: 'Gagal!', text: errorMessage, confirmButtonColor: '#667eea' });
+
+  } catch (error) {
+    console.error('Error:', error);
+    Swal.fire({ icon: 'error', title: 'Oops!', text: 'Terjadi kesalahan. Silakan coba lagi.', confirmButtonColor: '#667eea' });
+  } finally {
+    btnSubmit.disabled = false;
+    btnText.classList.remove('d-none');
+    btnLoading.classList.add('d-none');
+  }
+}
+
+function formatRupiah(amount) {
+  const number = parseInt(amount, 10);
+  return 'Rp ' + (isNaN(number) ? 0 : number).toLocaleString('id-ID');
 }

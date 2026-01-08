@@ -7,6 +7,9 @@ if (!function_exists('format_rupiah')) {
         return 'Rp ' . number_format((float)$number, 0, ',', '.');
     }
 }
+
+// Ensure stats is set
+$stats = $stats ?? [];
 ?>
 
 <?= $this->section('styles') ?>
@@ -37,6 +40,16 @@ if (!function_exists('format_rupiah')) {
         font-size: 12px;
         padding: 5px 10px;
     }
+    .quick-link-card {
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+        cursor: pointer;
+    }
+    .quick-link-card:hover {
+        transform: translateY(-3px);
+        border-color: var(--bs-primary);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
 </style>
 <?= $this->endSection() ?>
 
@@ -50,7 +63,7 @@ if (!function_exists('format_rupiah')) {
                 <h2 class="mb-1 fw-bold">
                     <i class="bi bi-speedometer2"></i> Dashboard Admin
                 </h2>
-                <p class="text-muted mb-0">Selamat datang, <?= esc(session()->get('user_name') ?? 'Admin') ?>!</p>
+                <p class="text-muted mb-0">Selamat datang, <?= esc(get_user_name() ?? session()->get('user_name') ?? 'Admin') ?>!</p>
             </div>
             <div>
                 <span class="badge bg-primary fs-6">
@@ -203,7 +216,6 @@ if (!function_exists('format_rupiah')) {
                                     <tr>
                                         <th>Order #</th>
                                         <th>Customer</th>
-                                        <th>Layanan</th>
                                         <th>Total</th>
                                         <th>Status</th>
                                         <th>Pembayaran</th>
@@ -214,6 +226,8 @@ if (!function_exists('format_rupiah')) {
                                     <?php if (!empty($recent_orders)): ?>
                                         <?php foreach (array_slice($recent_orders, 0, 5) as $order): ?>
                                             <?php
+                                            if (!is_array($order) || !isset($order['order_number'])) continue;
+                                            
                                             $status = $order['order_status'] ?? 'pending';
                                             $paymentStatus = $order['payment_status'] ?? 'pending';
                                             $statusConfig = [
@@ -221,35 +235,19 @@ if (!function_exists('format_rupiah')) {
                                                 'picked_up' => ['badge' => 'info', 'label' => 'Picked Up'],
                                                 'in_process' => ['badge' => 'primary', 'label' => 'In Process'],
                                                 'processing' => ['badge' => 'primary', 'label' => 'Processing'],
-                                                'washing' => ['badge' => 'primary', 'label' => 'Washing'],
-                                                'drying' => ['badge' => 'primary', 'label' => 'Drying'],
-                                                'quality_check' => ['badge' => 'info', 'label' => 'QC'],
-                                                'ready' => ['badge' => 'success', 'label' => 'Ready'],
-                                                'on_delivery' => ['badge' => 'info', 'label' => 'Delivery'],
                                                 'completed' => ['badge' => 'success', 'label' => 'Completed'],
                                                 'cancelled' => ['badge' => 'danger', 'label' => 'Cancelled']
                                             ];
                                             $statusInfo = $statusConfig[$status] ?? ['badge' => 'secondary', 'label' => ucfirst($status)];
-                                            
-                                            // Get service names
-                                            $services = [];
-                                            if (!empty($order['items'])) {
-                                                foreach ($order['items'] as $item) {
-                                                    $services[] = $item['service']['name'] ?? 'Service';
-                                                }
-                                            }
                                             ?>
                                             <tr>
                                                 <td>
                                                     <strong class="text-primary"><?= esc($order['order_number']) ?></strong>
-                                                    <br><small class="text-muted"><?= date('d/m/Y', strtotime($order['created_at'])) ?></small>
+                                                    <br><small class="text-muted"><?= date('d/m/Y', strtotime($order['created_at'] ?? 'now')) ?></small>
                                                 </td>
                                                 <td>
-                                                    <?= esc($order['guest_email'] ?? '-') ?>
-                                                    <br><small class="text-muted"><?= esc($order['guest_phone'] ?? '') ?></small>
-                                                </td>
-                                                <td>
-                                                    <small><?= esc(implode(', ', array_slice($services, 0, 2))) ?><?= count($services) > 2 ? '...' : '' ?></small>
+                                                    <?= esc($order['guest_name'] ?? $order['user']['name'] ?? '-') ?>
+                                                    <br><small class="text-muted"><?= esc($order['guest_phone'] ?? $order['user']['phone'] ?? '') ?></small>
                                                 </td>
                                                 <td><strong><?= format_rupiah($order['total_amount'] ?? 0) ?></strong></td>
                                                 <td>
@@ -271,7 +269,7 @@ if (!function_exists('format_rupiah')) {
                                         <?php endforeach; ?>
                                     <?php else: ?>
                                         <tr>
-                                            <td colspan="7" class="text-center py-4 text-muted">
+                                            <td colspan="6" class="text-center py-4 text-muted">
                                                 <i class="bi bi-inbox fs-1 d-block mb-2"></i>
                                                 Belum ada pesanan
                                             </td>
@@ -298,25 +296,90 @@ if (!function_exists('format_rupiah')) {
                     </div>
                 </div>
 
-                <!-- Quick Links -->
+                <!-- Quick Links Menu -->
                 <div class="card shadow-sm mb-4">
                     <div class="card-header bg-white">
                         <h5 class="mb-0 fw-bold"><i class="bi bi-lightning"></i> Menu Cepat</h5>
                     </div>
                     <div class="card-body">
-                        <div class="d-grid gap-2">
-                            <a href="<?= base_url('admin/orders') ?>" class="btn btn-outline-primary">
-                                <i class="bi bi-box-seam me-2"></i> Kelola Pesanan
-                            </a>
-                            <a href="<?= base_url('admin/users') ?>" class="btn btn-outline-success">
-                                <i class="bi bi-people me-2"></i> Kelola User
-                            </a>
-                            <a href="<?= base_url('admin/services') ?>" class="btn btn-outline-info">
-                                <i class="bi bi-tags me-2"></i> Kelola Layanan
-                            </a>
-                            <a href="<?= base_url('admin/branches') ?>" class="btn btn-outline-warning">
-                                <i class="bi bi-shop me-2"></i> Kelola Cabang
-                            </a>
+                        <div class="row g-3">
+                            <!-- Kelola Pesanan -->
+                            <div class="col-6">
+                                <a href="<?= base_url('admin/orders') ?>" class="card quick-link-card text-decoration-none h-100">
+                                    <div class="card-body text-center p-3">
+                                        <div class="bg-primary bg-opacity-10 rounded-circle d-inline-flex p-3 mb-2">
+                                            <i class="bi bi-box-seam fs-4 text-primary"></i>
+                                        </div>
+                                        <h6 class="mb-0 text-dark">Pesanan</h6>
+                                        <small class="text-muted"><?= $stats['total_orders'] ?? 0 ?> order</small>
+                                    </div>
+                                </a>
+                            </div>
+                            
+                            <!-- Kelola User -->
+                            <div class="col-6">
+                                <a href="<?= base_url('admin/users') ?>" class="card quick-link-card text-decoration-none h-100">
+                                    <div class="card-body text-center p-3">
+                                        <div class="bg-success bg-opacity-10 rounded-circle d-inline-flex p-3 mb-2">
+                                            <i class="bi bi-people fs-4 text-success"></i>
+                                        </div>
+                                        <h6 class="mb-0 text-dark">Users</h6>
+                                        <small class="text-muted"><?= $stats['total_users'] ?? 0 ?> user</small>
+                                    </div>
+                                </a>
+                            </div>
+                            
+                            <!-- Kelola Layanan -->
+                            <div class="col-6">
+                                <a href="<?= base_url('admin/services') ?>" class="card quick-link-card text-decoration-none h-100">
+                                    <div class="card-body text-center p-3">
+                                        <div class="bg-info bg-opacity-10 rounded-circle d-inline-flex p-3 mb-2">
+                                            <i class="bi bi-tags fs-4 text-info"></i>
+                                        </div>
+                                        <h6 class="mb-0 text-dark">Layanan</h6>
+                                        <small class="text-muted"><?= $stats['total_services'] ?? 0 ?> layanan</small>
+                                    </div>
+                                </a>
+                            </div>
+                            
+                            <!-- Kelola Cabang -->
+                            <div class="col-6">
+                                <a href="<?= base_url('admin/branches') ?>" class="card quick-link-card text-decoration-none h-100">
+                                    <div class="card-body text-center p-3">
+                                        <div class="bg-warning bg-opacity-10 rounded-circle d-inline-flex p-3 mb-2">
+                                            <i class="bi bi-shop fs-4 text-warning"></i>
+                                        </div>
+                                        <h6 class="mb-0 text-dark">Cabang</h6>
+                                        <small class="text-muted"><?= $stats['total_branches'] ?? 0 ?> cabang</small>
+                                    </div>
+                                </a>
+                            </div>
+                            
+                            <!-- Kelola Gallery -->
+                            <div class="col-6">
+                                <a href="<?= base_url('admin/gallery') ?>" class="card quick-link-card text-decoration-none h-100">
+                                    <div class="card-body text-center p-3">
+                                        <div class="rounded-circle d-inline-flex p-3 mb-2" style="background-color: rgba(111, 66, 193, 0.1);">
+                                            <i class="bi bi-images fs-4" style="color: #6f42c1;"></i>
+                                        </div>
+                                        <h6 class="mb-0 text-dark">Gallery</h6>
+                                        <small class="text-muted"><?= $stats['total_gallery'] ?? 0 ?> foto</small>
+                                    </div>
+                                </a>
+                            </div>
+                            
+                            <!-- Kelola Promo -->
+                            <div class="col-6">
+                                <a href="<?= base_url('admin/promo-codes') ?>" class="card quick-link-card text-decoration-none h-100">
+                                    <div class="card-body text-center p-3">
+                                        <div class="bg-danger bg-opacity-10 rounded-circle d-inline-flex p-3 mb-2">
+                                            <i class="bi bi-percent fs-4 text-danger"></i>
+                                        </div>
+                                        <h6 class="mb-0 text-dark">Promo</h6>
+                                        <small class="text-muted"><?= $stats['total_promos'] ?? 0 ?> promo</small>
+                                    </div>
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>

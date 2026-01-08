@@ -6,164 +6,311 @@ use App\Controllers\BaseController;
 
 /**
  * Admin Dashboard Controller
+ * 
+ * Fetches statistics from various API endpoints
  */
 class DashboardController extends BaseController
 {
     public function __construct()
     {
-        helper(['api', 'url', 'form']);
+        helper(['api', 'url', 'form', 'format']);
     }
 
     /**
-     * Admin Dashboard
+     * Dashboard Page
      */
     public function index()
     {
-        // Debug logging
-        log_message('info', '=== ADMIN DASHBOARD ACCESS ===');
-        log_message('info', 'Session logged_in: ' . (session()->get('logged_in') ? 'true' : 'false'));
-        log_message('info', 'Session auth_token: ' . (session()->get('auth_token') ? 'EXISTS' : 'NULL'));
-        log_message('info', 'Session user: ' . json_encode(session()->get('user')));
-
-        // Check if logged in
-        if (!is_logged_in()) {
-            log_message('warning', 'Admin access denied: Not logged in');
-            return redirect()->to('/auth/login')->with('error', 'Silakan login terlebih dahulu');
+        if (!is_logged_in() || !is_admin()) {
+            return redirect()->to('/auth/login')->with('error', 'Access denied');
         }
 
-        // Check if admin
-        if (!is_admin()) {
-            $user = session()->get('user');
-            $role = $user['role'] ?? 'unknown';
-            log_message('warning', "Admin access denied: User role is '{$role}', not 'admin'");
-            return redirect()->to('/user/dashboard')->with('error', 'Anda tidak memiliki akses ke halaman admin');
-        }
-
-        // Fetch dashboard data
         $data = [
-            'title' => 'Dashboard Admin - Tapak Bersih',
-            'user' => session()->get('user'),
-            'stats' => $this->getDashboardStats(),
+            'title' => 'Dashboard - Admin',
+            'stats' => $this->getStats(),
             'recent_orders' => $this->getRecentOrders(),
-            'revenue_data' => $this->getRevenueData()
+            'chart_data' => $this->getChartData()
         ];
 
         return view('admin/dashboard', $data);
     }
 
     /**
-     * Get dashboard statistics
+     * Get Dashboard Statistics
      */
-    private function getDashboardStats(): array
+    private function getStats()
     {
         $stats = [
             'total_orders' => 0,
-            'pending_orders' => 0,
-            'completed_orders' => 0,
+            'waiting_pickup' => 0,
+            'in_process' => 0,
+            'completed' => 0,
+            'cancelled' => 0,
             'total_revenue' => 0,
+            'paid' => 0,
+            'payment_pending' => 0,
+            'payment_failed' => 0,
             'total_users' => 0,
-            'total_services' => 0
+            'total_services' => 0,
+            'total_branches' => 0,
+            'total_gallery' => 0,
+            'total_promos' => 0
         ];
 
-        // Fetch orders
+        // Try to get stats from admin stats endpoint
+        $statsResponse = api_request('/admin/stats', 'GET', [], true);
+        
+        if (is_array($statsResponse)) {
+            if (isset($statsResponse['success']) && $statsResponse['success']) {
+                $statsData = $statsResponse['data'] ?? $statsResponse;
+                $stats = array_merge($stats, $this->extractStats($statsData));
+            } elseif (isset($statsResponse['total_orders'])) {
+                $stats = array_merge($stats, $this->extractStats($statsResponse));
+            }
+        }
+
+        // Fetch orders for order stats
         $ordersResponse = api_request('/admin/orders', 'GET', [], true);
-        if (isset($ordersResponse['success']) && $ordersResponse['success']) {
-            $orders = $ordersResponse['data']['data'] ?? $ordersResponse['data'] ?? [];
-            if (is_array($orders)) {
-                $stats['total_orders'] = count($orders);
-                foreach ($orders as $order) {
-                    if (isset($order['order_status'])) {
-                        if (in_array($order['order_status'], ['pending', 'waiting_pickup', 'in_process'])) {
-                            $stats['pending_orders']++;
-                        } elseif ($order['order_status'] === 'completed') {
-                            $stats['completed_orders']++;
-                        }
-                    }
-                    if (isset($order['total_amount'])) {
-                        $stats['total_revenue'] += (float)$order['total_amount'];
-                    }
+        $orders = $this->parseResponse($ordersResponse);
+        
+        if (!empty($orders)) {
+            $stats['total_orders'] = count($orders);
+            $stats['total_revenue'] = 0;
+            
+            foreach ($orders as $order) {
+                $orderStatus = $order['order_status'] ?? '';
+                $paymentStatus = $order['payment_status'] ?? '';
+                
+                // Count by order status
+                switch ($orderStatus) {
+                    case 'waiting_pickup':
+                        $stats['waiting_pickup']++;
+                        break;
+                    case 'in_process':
+                    case 'processing':
+                    case 'washing':
+                    case 'drying':
+                    case 'picked_up':
+                    case 'on_the_way_to_workshop':
+                    case 'arrived_at_workshop':
+                        $stats['in_process']++;
+                        break;
+                    case 'completed':
+                    case 'delivered':
+                        $stats['completed']++;
+                        break;
+                    case 'cancelled':
+                        $stats['cancelled']++;
+                        break;
+                }
+                
+                // Count by payment status
+                switch ($paymentStatus) {
+                    case 'paid':
+                        $stats['paid']++;
+                        $stats['total_revenue'] += floatval($order['total_amount'] ?? 0);
+                        break;
+                    case 'pending':
+                        $stats['payment_pending']++;
+                        break;
+                    case 'failed':
+                    case 'expired':
+                        $stats['payment_failed']++;
+                        break;
                 }
             }
         }
 
-        // Fetch users
+        // Fetch users count
         $usersResponse = api_request('/admin/users', 'GET', [], true);
-        if (isset($usersResponse['success']) && $usersResponse['success']) {
-            $users = $usersResponse['data']['data'] ?? $usersResponse['data'] ?? [];
-            $stats['total_users'] = is_array($users) ? count($users) : 0;
-        }
+        $users = $this->parseResponse($usersResponse);
+        $stats['total_users'] = count($users);
 
-        // Fetch services
+        // Fetch services count
         $servicesResponse = api_request('/services', 'GET', [], false);
-        if (is_array($servicesResponse)) {
-            $services = $servicesResponse['data'] ?? $servicesResponse;
-            if (isset($services[0])) {
-                $stats['total_services'] = count($services);
-            }
-        }
+        $services = $this->parseResponse($servicesResponse);
+        $stats['total_services'] = count($services);
+
+        // Fetch branches count
+        $branchesResponse = api_request('/branches', 'GET', [], false);
+        $branches = $this->parseResponse($branchesResponse);
+        $stats['total_branches'] = count($branches);
+
+        // Fetch gallery count
+        $galleryResponse = api_request('/galleries', 'GET', [], true);
+        $galleries = $this->parseResponse($galleryResponse);
+        $stats['total_gallery'] = count($galleries);
+
+        // Fetch promo codes count
+        $promoResponse = api_request('/admin/promo-codes', 'GET', [], true);
+        $promos = $this->parseResponse($promoResponse);
+        $stats['total_promos'] = count($promos);
+
+        log_message('info', 'Dashboard Stats: ' . json_encode($stats));
 
         return $stats;
     }
 
     /**
-     * Get recent orders
+     * Get Recent Orders
      */
-    private function getRecentOrders(): array
+    private function getRecentOrders()
     {
-        $response = api_request('/admin/orders', 'GET', [], true);
-        
-        if (isset($response['success']) && $response['success']) {
-            $orders = $response['data']['data'] ?? $response['data'] ?? [];
-            return array_slice($orders, 0, 5);
-        }
-
-        return [];
+        $response = api_request('/admin/orders', 'GET', ['limit' => 10], true);
+        return $this->parseResponse($response);
     }
 
     /**
-     * Get revenue data for chart
+     * Get Chart Data
      */
-    private function getRevenueData(): array
+    private function getChartData()
     {
-        $months = [];
-        $revenues = [];
-
-        for ($i = 5; $i >= 0; $i--) {
-            $date = strtotime("-{$i} months");
-            $months[] = date('M Y', $date);
-            $revenues[] = rand(1000000, 10000000); // Placeholder
-        }
-
-        return [
-            'labels' => $months,
-            'data' => $revenues
+        $chartData = [
+            'daily' => [],
+            'monthly' => [],
+            'status' => []
         ];
+
+        // Try to get chart data from API
+        $revenueResponse = api_request('/admin/reports/revenue', 'GET', [], true);
+        
+        if (is_array($revenueResponse) && isset($revenueResponse['success']) && $revenueResponse['success']) {
+            $data = $revenueResponse['data'] ?? [];
+            $chartData['daily'] = $data['daily'] ?? [];
+            $chartData['monthly'] = $data['monthly'] ?? [];
+        }
+
+        // Generate sample data if empty
+        if (empty($chartData['daily'])) {
+            $chartData['daily'] = $this->generateSampleDailyData();
+        }
+
+        if (empty($chartData['monthly'])) {
+            $chartData['monthly'] = $this->generateSampleMonthlyData();
+        }
+
+        return $chartData;
     }
 
     /**
-     * Debug endpoint - development only
+     * Generate sample daily data for chart
+     */
+    private function generateSampleDailyData()
+    {
+        $data = [];
+        for ($i = 6; $i >= 0; $i--) {
+            $date = date('d M', strtotime("-{$i} days"));
+            $data[] = [
+                'date' => $date,
+                'label' => $date,
+                'revenue' => 0,
+                'value' => 0
+            ];
+        }
+        return $data;
+    }
+
+    /**
+     * Generate sample monthly data for chart
+     */
+    private function generateSampleMonthlyData()
+    {
+        $data = [];
+        $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        $currentMonth = date('n') - 1;
+        
+        for ($i = 5; $i >= 0; $i--) {
+            $monthIndex = ($currentMonth - $i + 12) % 12;
+            $data[] = [
+                'month' => $months[$monthIndex],
+                'label' => $months[$monthIndex],
+                'revenue' => 0,
+                'value' => 0
+            ];
+        }
+        return $data;
+    }
+
+    /**
+     * Extract stats from response
+     */
+    private function extractStats($data)
+    {
+        $stats = [];
+        $keys = [
+            'total_orders', 'waiting_pickup', 'in_process', 'completed', 'cancelled',
+            'total_revenue', 'paid', 'payment_pending', 'payment_failed',
+            'total_users', 'total_services', 'total_branches', 'total_gallery', 'total_promos'
+        ];
+        
+        foreach ($keys as $key) {
+            if (isset($data[$key])) {
+                $stats[$key] = $data[$key];
+            }
+        }
+        
+        return $stats;
+    }
+
+    /**
+     * Parse API response
+     */
+    private function parseResponse($response)
+    {
+        $items = [];
+
+        if (is_array($response)) {
+            // Direct array of items
+            if (isset($response[0]) && is_array($response[0])) {
+                $items = $response;
+            }
+            // Success response with data
+            elseif (isset($response['success']) && $response['success']) {
+                $responseData = $response['data'] ?? [];
+                if (isset($responseData['data']) && is_array($responseData['data'])) {
+                    $items = $responseData['data'];
+                } elseif (is_array($responseData) && isset($responseData[0])) {
+                    $items = $responseData;
+                } elseif (is_array($responseData)) {
+                    $items = $responseData;
+                }
+            }
+            // Direct data without success field
+            elseif (isset($response['data']) && is_array($response['data'])) {
+                if (isset($response['data']['data'])) {
+                    $items = $response['data']['data'];
+                } else {
+                    $items = $response['data'];
+                }
+            }
+        }
+
+        // Filter valid items (must have id or order_number)
+        $validItems = [];
+        foreach ($items as $item) {
+            if (is_array($item) && (isset($item['id']) || isset($item['order_number']))) {
+                $validItems[] = $item;
+            }
+        }
+
+        return $validItems;
+    }
+
+    /**
+     * Debug endpoint
      */
     public function debug()
     {
-        if (ENVIRONMENT !== 'development') {
-            return $this->response->setJSON(['error' => 'Not available in production']);
+        if (!is_logged_in() || !is_admin()) {
+            return $this->response->setJSON(['error' => 'Access denied']);
         }
 
-        return $this->response->setJSON([
-            'session' => [
-                'logged_in' => session()->get('logged_in'),
-                'auth_token' => session()->get('auth_token') ? 'EXISTS (' . strlen(session()->get('auth_token')) . ' chars)' : 'NULL',
-                'user' => session()->get('user'),
-            ],
-            'checks' => [
-                'is_logged_in()' => is_logged_in(),
-                'is_admin()' => is_admin(),
-                'get_user_role()' => get_user_role(),
-            ],
-            'env' => [
-                'API_BASE_URL' => env('API_BASE_URL'),
-                'CI_ENVIRONMENT' => ENVIRONMENT,
-            ]
-        ]);
+        $debug = [
+            'stats' => $this->getStats(),
+            'galleries_raw' => api_request('/galleries', 'GET', [], true),
+            'promos_raw' => api_request('/admin/promo-codes', 'GET', [], true)
+        ];
+
+        return $this->response->setJSON($debug);
     }
 }

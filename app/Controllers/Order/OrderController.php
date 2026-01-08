@@ -1,120 +1,211 @@
 <?php
 
-namespace App\Controllers\Order;
+namespace App\Controllers\Admin;
 
 use App\Controllers\BaseController;
 
+/**
+ * Admin Order Management Controller
+ * 
+ * API Endpoints:
+ * - GET /api/admin/orders - List all orders
+ * - GET /api/admin/orders/{order_number} - Show order detail
+ * - PATCH /api/admin/orders/{order_number}/status - Update status
+ * - DELETE /api/admin/orders/{order_number} - Cancel/Delete order
+ */
 class OrderController extends BaseController
 {
     public function __construct()
     {
-        helper(['api', 'url']);
+        helper(['api', 'url', 'form', 'format']);
     }
 
     /**
-     * Show order detail for authenticated users
-     * API: GET /api/orders/{order_number}
+     * List all orders
      */
-    public function detail($orderNumber)
+    public function index()
     {
-        if (!is_logged_in()) {
-            return redirect()->to('auth/login')->with('error', 'Silakan login terlebih dahulu');
+        if (!is_logged_in() || !is_admin()) {
+            return redirect()->to('/auth/login')->with('error', 'Access denied');
         }
 
         $data = [
-            'title' => 'Detail Pesanan - ' . $orderNumber,
+            'title' => 'Manajemen Order - Admin',
+            'orders' => [],
+            'error' => null
+        ];
+
+        $response = api_request('/admin/orders', 'GET', [], true);
+        
+        log_message('info', 'Admin Orders Response: ' . json_encode($response));
+
+        $orders = $this->parseResponse($response);
+        $data['orders'] = $orders;
+
+        if (isset($response['message']) && empty($orders)) {
+            $data['error'] = $response['message'];
+        }
+
+        return view('admin/orders/index', $data);
+    }
+
+    /**
+     * Show order detail
+     */
+    public function show($orderNumber)
+    {
+        if (!is_logged_in() || !is_admin()) {
+            return redirect()->to('/auth/login')->with('error', 'Access denied');
+        }
+
+        $data = [
+            'title' => 'Detail Order - Admin',
             'order' => null,
             'error' => null
         ];
 
-        $response = api_request("/orders/{$orderNumber}", 'GET', [], true);
+        $response = api_request("/admin/orders/{$orderNumber}", 'GET', [], true);
+        
+        log_message('info', 'Admin Order Detail Response: ' . json_encode($response));
 
-        log_message('info', "Order {$orderNumber} Response: " . json_encode($response));
-
-        if (isset($response['success']) && $response['success']) {
-            $data['order'] = $response['data'] ?? null;
-        } else {
-            $data['error'] = $response['message'] ?? 'Pesanan tidak ditemukan';
+        if (is_array($response)) {
+            if (isset($response['success']) && $response['success']) {
+                $data['order'] = $response['data'] ?? null;
+            } elseif (isset($response['order_number'])) {
+                $data['order'] = $response;
+            } elseif (isset($response['data'])) {
+                $data['order'] = $response['data'];
+            } elseif (isset($response['message'])) {
+                $data['error'] = $response['message'];
+            }
         }
 
-        return view('order/detail', $data);
+        if (!$data['order']) {
+            $data['error'] = 'Order tidak ditemukan';
+        }
+
+        return view('admin/orders/detail', $data);
     }
 
     /**
-     * Track order (public with order number)
-     * API: GET /api/orders/{order_number}
+     * Update order status
+     * API: PATCH /api/admin/orders/{order_number}/status
+     * 
+     * Format yang diharapkan API:
+     * {
+     *   "order_status": "in_process",
+     *   "notes": "Catatan opsional"
+     * }
      */
-    public function track($orderNumber)
+    public function updateStatus($orderNumber)
     {
-        $data = [
-            'title' => 'Lacak Pesanan - ' . $orderNumber,
-            'order' => null,
-            'error' => null
-        ];
-
-        $response = api_request("/orders/{$orderNumber}", 'GET');
-
-        log_message('info', "Track Order {$orderNumber} Response: " . json_encode($response));
-
-        if (isset($response['success']) && $response['success']) {
-            $data['order'] = $response['data'] ?? null;
-        } else {
-            $data['error'] = $response['message'] ?? 'Pesanan tidak ditemukan';
+        if (!is_logged_in() || !is_admin()) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Access denied']);
         }
 
-        return view('order/track', $data);
-    }
+        // Get status from POST - support both 'status' and 'order_status' field names
+        $status = $this->request->getPost('order_status') ?? $this->request->getPost('status');
+        $notes = $this->request->getPost('notes') ?? '';
 
-    /**
-     * Update order
-     * API: PUT /api/orders/{order_number}
-     */
-    public function update($orderNumber)
-    {
-        if (!is_logged_in()) {
+        if (empty($status)) {
             return $this->response->setJSON([
-                'success' => false,
-                'message' => 'Unauthorized'
+                'success' => false, 
+                'message' => 'Status harus dipilih'
             ]);
         }
 
-        $data = [
-            'pickup_address' => $this->request->getPost('pickup_address'),
-            'pickup_date' => $this->request->getPost('pickup_date'),
-            'pickup_time' => $this->request->getPost('pickup_time'),
-            'shoe_type' => $this->request->getPost('shoe_type'),
-            'special_notes' => $this->request->getPost('special_notes')
+        // Send dengan field name yang benar: order_status
+        $postData = [
+            'order_status' => $status
         ];
 
-        // Remove null values
-        $data = array_filter($data, function($value) {
-            return $value !== null && $value !== '';
-        });
+        // Tambahkan notes jika ada
+        if (!empty($notes)) {
+            $postData['notes'] = $notes;
+        }
 
-        $response = api_request("/orders/{$orderNumber}", 'PUT', $data, true);
+        log_message('info', 'Order Status Update - Order: ' . $orderNumber);
+        log_message('info', 'Order Status Update - Data: ' . json_encode($postData));
 
-        return $this->response->setJSON($response);
+        $response = api_request("/admin/orders/{$orderNumber}/status", 'PATCH', $postData, true);
+        
+        log_message('info', 'Order Status Update Response: ' . json_encode($response));
+
+        if (isset($response['success']) && $response['success']) {
+            return $this->response->setJSON([
+                'success' => true, 
+                'message' => 'Status order berhasil diupdate'
+            ]);
+        }
+
+        return $this->response->setJSON([
+            'success' => false, 
+            'message' => $response['message'] ?? 'Gagal mengupdate status order'
+        ]);
     }
 
     /**
-     * Cancel order
-     * API: DELETE /api/orders/{order_number}
+     * Cancel/Delete order
+     * API: DELETE /api/admin/orders/{order_number}
      */
     public function cancel($orderNumber)
     {
-        if (!is_logged_in()) {
+        if (!is_logged_in() || !is_admin()) {
+            return $this->response->setJSON(['success' => false, 'message' => 'Access denied']);
+        }
+
+        $response = api_request("/admin/orders/{$orderNumber}", 'DELETE', [], true);
+        
+        log_message('info', 'Order Cancel Response: ' . json_encode($response));
+
+        if (isset($response['success']) && $response['success']) {
             return $this->response->setJSON([
-                'success' => false,
-                'message' => 'Unauthorized'
+                'success' => true, 
+                'message' => 'Order berhasil dibatalkan'
             ]);
         }
 
-        $data = [
-            'reason' => $this->request->getPost('reason')
-        ];
+        return $this->response->setJSON([
+            'success' => false, 
+            'message' => $response['message'] ?? 'Gagal membatalkan order'
+        ]);
+    }
 
-        $response = api_request("/orders/{$orderNumber}", 'DELETE', $data, true);
+    /**
+     * Parse API response to array
+     */
+    private function parseResponse($response)
+    {
+        $items = [];
 
-        return $this->response->setJSON($response);
+        if (is_array($response)) {
+            if (isset($response[0]) && is_array($response[0]) && isset($response[0]['order_number'])) {
+                $items = $response;
+            } elseif (isset($response['success']) && $response['success']) {
+                $responseData = $response['data'] ?? [];
+                if (isset($responseData['data']) && is_array($responseData['data'])) {
+                    $items = $responseData['data'];
+                } elseif (is_array($responseData) && isset($responseData[0])) {
+                    $items = $responseData;
+                } elseif (is_array($responseData)) {
+                    $items = $responseData;
+                }
+            } elseif (isset($response['data']) && is_array($response['data'])) {
+                if (isset($response['data']['data'])) {
+                    $items = $response['data']['data'];
+                } else {
+                    $items = $response['data'];
+                }
+            }
+        }
+
+        $validItems = [];
+        foreach ($items as $item) {
+            if (is_array($item) && (isset($item['order_number']) || isset($item['id']))) {
+                $validItems[] = $item;
+            }
+        }
+
+        return $validItems;
     }
 }

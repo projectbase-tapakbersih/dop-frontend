@@ -25,9 +25,12 @@
         background: #e0e0e0;
         z-index: -1;
     }
-    .step:first-child::before { left: 50%; }
-    .step:last-child::before { right: 50%; }
-
+    .step:first-child::before {
+        left: 50%;
+    }
+    .step:last-child::before {
+        right: 50%;
+    }
     .step-number {
         width: 50px;
         height: 50px;
@@ -48,7 +51,6 @@
         background: #28a745;
         color: white;
     }
-
     .service-option, .branch-option {
         border: 2px solid #e0e0e0;
         border-radius: 10px;
@@ -64,9 +66,10 @@
         border-color: #667eea;
         background: #f8f9ff;
     }
-
-    .order-summary { position: sticky; top: 20px; }
-
+    .order-summary {
+        position: sticky;
+        top: 20px;
+    }
     .plastic-bag-warning {
         border: 2px dashed #ffc107;
         background: #fff3cd;
@@ -96,8 +99,8 @@
 <!-- Order Form -->
 <section class="py-5">
     <div class="container">
-
-        <?php if (!empty($error)): ?>
+        
+        <?php if ($error): ?>
             <div class="alert alert-danger">
                 <i class="bi bi-exclamation-triangle"></i> <?= esc($error) ?>
             </div>
@@ -124,7 +127,7 @@
             <div class="col-lg-8">
                 <div class="card shadow-sm">
                     <div class="card-body p-4">
-
+                        
                         <!-- Step Indicator -->
                         <div class="step-indicator mb-4">
                             <div class="step active" id="step1">
@@ -145,12 +148,7 @@
                             </div>
                         </div>
 
-                        <?php
-                            // ✅ FIX: pastikan submit menuju route yang ada
-                            $checkoutAction = base_url(is_logged_in() ? 'order/checkout' : 'order/guest-checkout');
-                        ?>
-
-                        <form id="orderForm" method="post" action="<?= $checkoutAction ?>">
+                        <form id="orderForm">
                             <?= csrf_field() ?>
 
                             <!-- STEP 1: Pilih Layanan -->
@@ -167,15 +165,15 @@
                                     <div class="row g-3">
                                         <?php foreach ($services as $service): ?>
                                             <div class="col-md-6">
-                                                <div class="service-option <?= ($selected_service && $selected_service['id'] == $service['id']) ? 'selected' : '' ?>"
+                                                <div class="service-option <?= ($selected_service && $selected_service['id'] == $service['id']) ? 'selected' : '' ?>" 
                                                      data-service-id="<?= $service['id'] ?>"
                                                      data-service-name="<?= esc($service['name']) ?>"
                                                      data-service-price="<?= $service['price'] ?>"
                                                      data-service-duration="<?= $service['duration_hours'] ?>">
                                                     <div class="form-check">
-                                                        <input class="form-check-input"
-                                                               type="radio"
-                                                               name="service_id"
+                                                        <input class="form-check-input" 
+                                                               type="radio" 
+                                                               name="service_id" 
                                                                value="<?= $service['id'] ?>"
                                                                <?= ($selected_service && $selected_service['id'] == $service['id']) ? 'checked' : '' ?>
                                                                required>
@@ -227,19 +225,19 @@
 
                                     <div class="col-md-6">
                                         <label class="form-label fw-bold">Ukuran Sepatu</label>
-                                        <input type="text"
-                                               class="form-control"
-                                               name="shoe_size"
-                                               id="shoe_size"
+                                        <input type="text" 
+                                               class="form-control" 
+                                               name="shoe_size" 
+                                               id="shoe_size" 
                                                placeholder="Contoh: 42">
                                         <small class="text-muted">Opsional</small>
                                     </div>
 
                                     <div class="col-12">
                                         <label class="form-label fw-bold">Catatan Kondisi Sepatu</label>
-                                        <textarea class="form-control"
-                                                  name="special_notes"
-                                                  id="special_notes"
+                                        <textarea class="form-control" 
+                                                  name="special_notes" 
+                                                  id="special_notes" 
                                                   rows="4"
                                                   placeholder="Contoh: Ada noda membandel di bagian samping, sol agak lepas, dll."></textarea>
                                         <small class="text-muted">Jelaskan kondisi sepatu untuk penanganan yang lebih baik</small>
@@ -274,9 +272,9 @@
                                                     <div class="branch-option <?= ($selected_branch && $selected_branch['id'] == $branch['id']) ? 'selected' : '' ?>"
                                                          data-branch-id="<?= $branch['id'] ?>">
                                                         <div class="form-check">
-                                                            <input class="form-check-input"
-                                                                   type="radio"
-                                                                   name="branch_id"
+                                                            <input class="form-check-input" 
+                                                                   type="radio" 
+                                                                   name="branch_id" 
                                                                    value="<?= $branch['id'] ?>"
                                                                    <?= ($selected_branch && $selected_branch['id'] == $branch['id']) ? 'checked' : '' ?>
                                                                    required>
@@ -301,9 +299,9 @@
                                 <!-- Pickup Address -->
                                 <div class="mb-3">
                                     <label class="form-label fw-bold">Alamat Lengkap Penjemputan *</label>
-                                    <textarea class="form-control"
-                                              name="pickup_address"
-                                              id="pickup_address"
+                                    <textarea class="form-control" 
+                                              name="pickup_address" 
+                                              id="pickup_address" 
                                               rows="3"
                                               placeholder="Contoh: Jl. Raya Darmo No. 123, Surabaya"
                                               minlength="10"
@@ -316,9 +314,9 @@
                                 <div class="row g-3">
                                     <div class="col-md-6">
                                         <label class="form-label fw-bold">Tanggal Penjemputan *</label>
-                                        <input type="date"
-                                               class="form-control"
-                                               name="pickup_date"
+                                        <input type="date" 
+                                               class="form-control" 
+                                               name="pickup_date" 
                                                id="pickup_date"
                                                min="<?= date('Y-m-d') ?>"
                                                required>
@@ -327,9 +325,9 @@
 
                                     <div class="col-md-6">
                                         <label class="form-label fw-bold">Waktu Penjemputan *</label>
-                                        <input type="time"
-                                               class="form-control"
-                                               name="pickup_time"
+                                        <input type="time" 
+                                               class="form-control" 
+                                               name="pickup_time" 
                                                id="pickup_time"
                                                required>
                                         <small class="text-muted">Jam operasional: 08:00 - 20:00</small>
@@ -362,10 +360,10 @@
                                         <div class="row g-3">
                                             <div class="col-md-6">
                                                 <label class="form-label fw-bold">Nama Lengkap *</label>
-                                                <input type="text"
-                                                       class="form-control"
-                                                       name="name"
-                                                       id="guest_name"
+                                                <input type="text" 
+                                                       class="form-control" 
+                                                       name="name" 
+                                                       id="guest_name" 
                                                        placeholder="Masukkan nama lengkap"
                                                        value="<?= $user && isset($user['name']) ? esc($user['name']) : '' ?>"
                                                        required>
@@ -373,10 +371,10 @@
                                             </div>
                                             <div class="col-md-6">
                                                 <label class="form-label fw-bold">Nomor HP (WhatsApp) *</label>
-                                                <input type="tel"
-                                                       class="form-control"
-                                                       name="phone"
-                                                       id="guest_phone"
+                                                <input type="tel" 
+                                                       class="form-control" 
+                                                       name="phone" 
+                                                       id="guest_phone" 
                                                        placeholder="08xxxxxxxxxx"
                                                        value="<?= $user && isset($user['phone']) ? esc($user['phone']) : '' ?>"
                                                        required>
@@ -393,9 +391,9 @@
                                         Konfirmasi Penggunaan Kantong Plastik
                                     </h6>
                                     <div class="form-check">
-                                        <input class="form-check-input"
-                                               type="checkbox"
-                                               name="plastic_bag_confirmed"
+                                        <input class="form-check-input" 
+                                               type="checkbox" 
+                                               name="plastic_bag_confirmed" 
                                                id="plastic_bag_confirmed"
                                                value="true"
                                                required>
@@ -415,12 +413,12 @@
                                     <div class="row g-3">
                                         <div class="col-md-6">
                                             <div class="form-check border rounded p-3">
-                                                <input class="form-check-input"
-                                                       type="radio"
-                                                       name="payment_method"
-                                                       value="qris"
-                                                       id="payment_qris"
-                                                       required>
+                                                <input class="form-check-input" 
+                                                    type="radio" 
+                                                    name="payment_method" 
+                                                    value="qris" 
+                                                    id="payment_qris"
+                                                    required>
                                                 <label class="form-check-label w-100" for="payment_qris">
                                                     <strong>QRIS</strong>
                                                     <small class="d-block text-muted">Scan & Pay (Semua e-wallet)</small>
@@ -429,12 +427,12 @@
                                         </div>
                                         <div class="col-md-6">
                                             <div class="form-check border rounded p-3">
-                                                <input class="form-check-input"
-                                                       type="radio"
-                                                       name="payment_method"
-                                                       value="transfer"
-                                                       id="payment_transfer"
-                                                       required>
+                                                <input class="form-check-input" 
+                                                    type="radio" 
+                                                    name="payment_method" 
+                                                    value="transfer" 
+                                                    id="payment_transfer"
+                                                    required>
                                                 <label class="form-check-label w-100" for="payment_transfer">
                                                     <strong>Transfer Bank</strong>
                                                     <small class="d-block text-muted">BNI / Mandiri (Virtual Account)</small>
@@ -444,6 +442,7 @@
                                     </div>
                                     <div class="invalid-feedback" id="error-payment_method"></div>
                                 </div>
+
 
                                 <!-- Terms -->
                                 <div class="alert alert-info">
@@ -530,14 +529,13 @@
                         <i class="bi bi-whatsapp fs-1 text-success mb-2"></i>
                         <h6 class="fw-bold">Butuh Bantuan?</h6>
                         <p class="small text-muted mb-3">Hubungi kami via WhatsApp</p>
-                        <a href="https://wa.me/6281234567890?text=Halo%20Tapak%20Bersih,%20saya%20butuh%20bantuan%20untuk%20pemesanan"
-                           target="_blank"
+                        <a href="https://wa.me/6281234567890?text=Halo%20Tapak%20Bersih,%20saya%20butuh%20bantuan%20untuk%20pemesanan" 
+                           target="_blank" 
                            class="btn btn-success btn-sm">
                             <i class="bi bi-whatsapp"></i> Chat Sekarang
                         </a>
                     </div>
                 </div>
-
             </div>
         </div>
     </div>
@@ -549,10 +547,8 @@
 <!-- SweetAlert2 JS -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
+<!-- Pass PHP variables to JavaScript -->
 <script>
-    // ✅ Penting untuk order.js redirect ke /payment/{order_number}
-    const BASE_URL = "<?= base_url() ?>";
-
     // User login status
     const USER_LOGGED_IN = <?= $user ? 'true' : 'false' ?>;
     const USER_DATA = <?= $user ? json_encode($user) : 'null' ?>;

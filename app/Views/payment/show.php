@@ -1,687 +1,486 @@
 <?= $this->extend('layouts/main') ?>
 
 <?= $this->section('styles') ?>
-<!-- SweetAlert2 CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
 <style>
-    .payment-method {
-        border: 2px solid #e0e0e0;
-        border-radius: 15px;
-        padding: 20px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        height: 100%;
-    }
-    .payment-method:hover {
-        border-color: #667eea;
-        box-shadow: 0 5px 20px rgba(102, 126, 234, 0.2);
-    }
-    .payment-method.selected {
-        border-color: #667eea;
-        background: #f8f9ff;
-    }
-    .payment-method input[type="radio"] {
-        display: none;
-    }
-    .qr-code-container {
-        background: white;
-        padding: 20px;
-        border-radius: 15px;
-        text-align: center;
-    }
-    .bank-account-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border-radius: 15px;
-        padding: 25px;
-        margin-bottom: 15px;
-    }
-    .countdown-timer {
-        background: #fff3cd;
-        border: 2px solid #ffc107;
-        border-radius: 10px;
-        padding: 15px;
-        text-align: center;
-    }
-    .timer-value {
-        font-size: 2rem;
-        font-weight: bold;
-        color: #dc3545;
-    }
+  .payment-method{border:2px solid #e9ecef;border-radius:16px;padding:18px;cursor:pointer;transition:.2s ease;background:#fff;height:100%}
+  .payment-method:hover{border-color:#667eea;box-shadow:0 10px 20px rgba(102,126,234,.12);transform:translateY(-1px)}
+  .payment-method.selected{border-color:#667eea;background:#f6f7ff}
+  .payment-details-card{border-radius:16px;overflow:hidden}
+  .qr-box{display:flex;align-items:center;justify-content:center;padding:18px;background:#fff;border:1px solid #e9ecef;border-radius:12px;min-height:320px}
+  .qr-img{max-width:280px;width:100%;height:auto}
+  .va-number-card{background:linear-gradient(135deg, rgba(102,126,234,.12) 0%, rgba(118,75,162,.12) 100%);border:1px solid rgba(102,126,234,.25);border-radius:14px;padding:18px}
+  .va-number{font-size:1.6rem;font-weight:800;letter-spacing:1px}
+  #loadingOverlay{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:9999}
+  #loadingOverlay.active{display:flex}
 </style>
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
 
-<?php 
-// Debug - Uncomment untuk melihat struktur data
-// echo '<pre>' . print_r($order, true) . '</pre>'; 
+<?php
+$order = $order ?? null;
+$payment = $payment ?? null;
+$error = $error ?? null;
+$orderNumber = $orderNumber ?? ($order['order_number'] ?? null);
 
-// Extract order data dengan multiple fallbacks
-$orderNumber = $order['order_number'] ?? $order['id'] ?? 'N/A';
+$hasOrder = !empty($orderNumber);
+$hasPayment = is_array($payment) && !empty($payment);
+$paymentChannel = $hasPayment ? ($payment['channel'] ?? null) : null;
 
-// Get total price - coba berbagai kemungkinan struktur
-$totalPrice = $order['total_price'] 
-    ?? $order['total'] 
-    ?? $order['total_amount']
-    ?? $order['grand_total']
-    ?? 0;
+$totalPrice = (float)($order['total_amount'] ?? $order['total_price'] ?? 0);
 
-// Jika total masih 0, coba hitung dari items
-if ($totalPrice == 0 && isset($order['items']) && is_array($order['items'])) {
-    foreach ($order['items'] as $item) {
-        $totalPrice += ($item['price'] ?? 0) * ($item['quantity'] ?? 1);
-    }
-}
+$qrisPayload = ($hasPayment && $paymentChannel === 'qris') ? ($payment['qris_payload'] ?? null) : null;
+$qrisQrString = ($hasPayment && $paymentChannel === 'qris') ? ($payment['qr_string'] ?? null) : null;
 
-// Jika masih 0, coba dari service price
-if ($totalPrice == 0) {
-    $totalPrice = $order['service']['price'] 
-        ?? $order['service_price'] 
-        ?? $order['items'][0]['service']['price'] 
-        ?? $order['items'][0]['price']
-        ?? 0;
-}
-
-// Get service name
-$serviceName = $order['service']['name'] 
-    ?? $order['service_name'] 
-    ?? $order['items'][0]['service']['name'] 
-    ?? $order['items'][0]['service_name']
-    ?? '-';
-
-// Get branch name
-$branchName = $order['branch']['name'] 
-    ?? $order['branch_name'] 
-    ?? '-';
+$vaNumber = ($hasPayment && in_array($paymentChannel, ['va_bni','va_mandiri'], true)) ? ($payment['va_number'] ?? null) : null;
 ?>
 
-<?php if (!empty($error)): ?>
-    <!-- Error State -->
-    <section class="py-5">
-        <div class="container">
-            <div class="text-center py-5">
-                <i class="bi bi-exclamation-triangle display-1 text-danger"></i>
-                <h2 class="mt-3"><?= esc($error) ?></h2>
-                <a href="<?= base_url('/') ?>" class="btn btn-primary mt-3">
-                    <i class="bi bi-house"></i> Kembali ke Beranda
-                </a>
-            </div>
-        </div>
-    </section>
+<div id="loadingOverlay">
+  <div class="bg-white rounded-4 p-4 text-center shadow">
+    <div class="spinner-border" role="status"></div>
+    <div class="mt-3 fw-bold">Memproses...</div>
+    <div class="text-muted small">Mohon tunggu sebentar</div>
+  </div>
+</div>
 
-<?php elseif (!empty($order)): ?>
+<?php if ($hasOrder): ?>
+<section class="py-4 bg-light">
+  <div class="container">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <h2 class="mb-1 fw-bold">Pembayaran</h2>
+        <p class="text-muted mb-0">Nomor Pesanan: <strong><?= esc($orderNumber) ?></strong></p>
+      </div>
+      <a href="<?= base_url('/') ?>" class="btn btn-outline-secondary"><i class="bi bi-house"></i> Beranda</a>
+    </div>
+  </div>
+</section>
 
-    <!-- Page Header -->
-    <section class="py-4 bg-light">
-        <div class="container">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h2 class="mb-1 fw-bold">
-                        <i class="bi bi-credit-card"></i> Pembayaran
-                    </h2>
-                    <p class="text-muted mb-0">Pesanan: <?= esc($orderNumber) ?></p>
+<section class="py-5">
+  <div class="container">
+    <?php if ($error): ?>
+      <div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> <?= esc($error) ?></div>
+    <?php endif; ?>
+
+    <div class="row g-4">
+      <div class="col-lg-8">
+
+        <div class="card shadow-sm mb-4">
+          <div class="card-header bg-white border-bottom">
+            <h5 class="mb-0 fw-bold"><i class="bi bi-wallet2"></i> Pilih Metode Pembayaran</h5>
+          </div>
+          <div class="card-body p-4">
+            <div class="row g-3">
+              <div class="col-md-4">
+                <div class="payment-method <?= $paymentChannel==='qris' ? 'selected':'' ?>" data-channel="qris" onclick="selectPaymentMethod('qris')">
+                  <div class="text-center mb-2"><i class="bi bi-qr-code display-5 text-primary"></i></div>
+                  <h6 class="fw-bold text-center mb-1">QRIS</h6>
+                  <div class="text-muted small text-center">Scan & Pay</div>
+                  <div class="text-muted small text-center">Semua e-wallet</div>
                 </div>
-                <span class="badge bg-warning text-dark px-3 py-2">
-                    <i class="bi bi-clock"></i> Menunggu Pembayaran
-                </span>
-            </div>
-        </div>
-    </section>
-
-    <!-- Payment Content -->
-    <section class="py-5">
-        <div class="container">
-            <div class="row">
-                <!-- Payment Methods -->
-                <div class="col-lg-8 mb-4">
-                    
-                    <!-- Countdown Timer -->
-                    <div class="countdown-timer mb-4">
-                        <p class="mb-2 fw-bold">Selesaikan pembayaran dalam:</p>
-                        <div class="timer-value" id="countdown">24:00:00</div>
-                        <small class="text-muted">Pesanan akan dibatalkan otomatis jika tidak dibayar</small>
-                    </div>
-
-                    <!-- Choose Payment Method -->
-                    <div class="card shadow-sm mb-4">
-                        <div class="card-header bg-white">
-                            <h5 class="mb-0 fw-bold">
-                                <i class="bi bi-wallet2"></i> Pilih Metode Pembayaran
-                            </h5>
-                        </div>
-                        <div class="card-body p-4">
-                            <div class="row g-3" id="paymentMethods">
-                                
-                                <!-- QRIS -->
-                                <div class="col-md-6">
-                                    <div class="payment-method" data-method="qris" onclick="selectPaymentMethod('qris')">
-                                        <input type="radio" name="payment_method_select" value="qris" id="qris_select">
-                                        <label class="w-100" for="qris_select">
-                                            <div class="text-center mb-3">
-                                                <i class="bi bi-qr-code display-4 text-primary"></i>
-                                            </div>
-                                            <h5 class="fw-bold text-center">QRIS</h5>
-                                            <p class="text-muted text-center mb-0 small">
-                                                Scan & Pay dengan semua e-wallet
-                                            </p>
-                                            <div class="mt-3 d-flex justify-content-center gap-2 flex-wrap">
-                                                <span class="badge bg-light text-dark border">GoPay</span>
-                                                <span class="badge bg-light text-dark border">OVO</span>
-                                                <span class="badge bg-light text-dark border">Dana</span>
-                                                <span class="badge bg-light text-dark border">ShopeePay</span>
-                                            </div>
-                                        </label>
-                                    </div>
-                                </div>
-
-                                <!-- Bank Transfer -->
-                                <div class="col-md-6">
-                                    <div class="payment-method" data-method="bank_transfer" onclick="selectPaymentMethod('bank_transfer')">
-                                        <input type="radio" name="payment_method_select" value="bank_transfer" id="bank_transfer_select">
-                                        <label class="w-100" for="bank_transfer_select">
-                                            <div class="text-center mb-3">
-                                                <i class="bi bi-bank display-4 text-success"></i>
-                                            </div>
-                                            <h5 class="fw-bold text-center">Transfer Bank</h5>
-                                            <p class="text-muted text-center mb-0 small">
-                                                Transfer ke rekening bank kami
-                                            </p>
-                                            <div class="mt-3 d-flex justify-content-center gap-2 flex-wrap">
-                                                <span class="badge bg-light text-dark border">BCA</span>
-                                                <span class="badge bg-light text-dark border">Mandiri</span>
-                                                <span class="badge bg-light text-dark border">BNI</span>
-                                                <span class="badge bg-light text-dark border">BRI</span>
-                                            </div>
-                                        </label>
-                                    </div>
-                                </div>
-
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- QRIS Payment Details (Hidden by default) -->
-                    <div class="card shadow-sm mb-4 d-none" id="qrisDetails">
-                        <div class="card-header bg-primary text-white">
-                            <h5 class="mb-0">
-                                <i class="bi bi-qr-code"></i> Pembayaran QRIS
-                            </h5>
-                        </div>
-                        <div class="card-body p-4">
-                            <div class="qr-code-container">
-                                <!-- QR Code -->
-                                <div class="mb-3">
-                                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=<?= urlencode('QRIS-TapakBersih-' . $orderNumber . '-' . $totalPrice) ?>" 
-                                         alt="QR Code" 
-                                         class="img-fluid"
-                                         style="max-width: 300px;">
-                                </div>
-                                <h4 class="fw-bold mb-3">Scan QR Code</h4>
-                                <p class="text-muted mb-4">
-                                    Buka aplikasi e-wallet favorit Anda dan scan QR code di atas
-                                </p>
-                                <div class="alert alert-info">
-                                    <strong>Total Pembayaran:</strong><br>
-                                    <h3 class="text-primary mb-0"><?= format_rupiah($totalPrice) ?></h3>
-                                </div>
-                            </div>
-
-                            <hr>
-
-                            <h6 class="fw-bold mb-3">Cara Pembayaran:</h6>
-                            <ol class="text-muted">
-                                <li>Buka aplikasi e-wallet (GoPay, OVO, Dana, ShopeePay, dll)</li>
-                                <li>Pilih menu "Scan QR" atau "Bayar"</li>
-                                <li>Scan QR code di atas</li>
-                                <li>Konfirmasi pembayaran</li>
-                                <li>Simpan bukti pembayaran</li>
-                            </ol>
-
-                            <div class="alert alert-warning">
-                                <i class="bi bi-exclamation-triangle"></i>
-                                <strong>Penting:</strong> Setelah pembayaran berhasil, upload bukti pembayaran di bawah ini
-                            </div>
-
-                            <!-- Upload Proof QRIS -->
-                            <div class="mt-4">
-                                <h6 class="fw-bold mb-3">Upload Bukti Pembayaran</h6>
-                                <form id="qrisProofForm" enctype="multipart/form-data">
-                                    <?= csrf_field() ?>
-                                    <input type="hidden" name="payment_method" value="qris">
-                                    
-                                    <div class="mb-3">
-                                        <label class="form-label">Bukti Pembayaran (Screenshot) *</label>
-                                        <input type="file" 
-                                               class="form-control" 
-                                               name="payment_proof" 
-                                               accept="image/*"
-                                               required>
-                                        <small class="text-muted">Format: JPG, PNG (Max 2MB)</small>
-                                    </div>
-                                    
-                                    <button type="submit" class="btn btn-success btn-lg w-100">
-                                        <i class="bi bi-check-circle"></i> Konfirmasi Pembayaran QRIS
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Bank Transfer Details (Hidden by default) -->
-                    <div class="card shadow-sm mb-4 d-none" id="bankTransferDetails">
-                        <div class="card-header bg-success text-white">
-                            <h5 class="mb-0">
-                                <i class="bi bi-bank"></i> Transfer Bank
-                            </h5>
-                        </div>
-                        <div class="card-body p-4">
-                            
-                            <h6 class="fw-bold mb-3">Pilih Bank Tujuan:</h6>
-
-                            <!-- BCA -->
-                            <div class="bank-account-card">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <h5 class="mb-0 fw-bold">Bank BCA</h5>
-                                    <button type="button" class="btn btn-light btn-sm" onclick="copyText('1234567890')">
-                                        <i class="bi bi-clipboard"></i> Copy
-                                    </button>
-                                </div>
-                                <p class="mb-1">No. Rekening</p>
-                                <h4 class="fw-bold mb-2">1234 5678 90</h4>
-                                <p class="mb-0">a.n. <strong>PT Tapak Bersih Indonesia</strong></p>
-                            </div>
-
-                            <!-- Mandiri -->
-                            <div class="bank-account-card">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <h5 class="mb-0 fw-bold">Bank Mandiri</h5>
-                                    <button type="button" class="btn btn-light btn-sm" onclick="copyText('0987654321')">
-                                        <i class="bi bi-clipboard"></i> Copy
-                                    </button>
-                                </div>
-                                <p class="mb-1">No. Rekening</p>
-                                <h4 class="fw-bold mb-2">0987 6543 21</h4>
-                                <p class="mb-0">a.n. <strong>PT Tapak Bersih Indonesia</strong></p>
-                            </div>
-
-                            <div class="alert alert-info">
-                                <strong>Total Transfer:</strong><br>
-                                <h3 class="text-primary mb-0"><?= format_rupiah($totalPrice) ?></h3>
-                            </div>
-
-                            <hr>
-
-                            <h6 class="fw-bold mb-3">Cara Pembayaran:</h6>
-                            <ol class="text-muted">
-                                <li>Transfer sesuai nominal di atas ke salah satu rekening</li>
-                                <li>Simpan bukti transfer</li>
-                                <li>Upload bukti transfer di bawah ini</li>
-                                <li>Tunggu konfirmasi dari kami (maks 1x24 jam)</li>
-                            </ol>
-
-                            <div class="alert alert-warning">
-                                <i class="bi bi-exclamation-triangle"></i>
-                                <strong>Penting:</strong> Transfer harus sesuai nominal EXACT untuk verifikasi otomatis
-                            </div>
-
-                            <!-- Upload Proof Transfer -->
-                            <div class="mt-4">
-                                <h6 class="fw-bold mb-3">Upload Bukti Transfer</h6>
-                                <form id="transferProofForm" enctype="multipart/form-data">
-                                    <?= csrf_field() ?>
-                                    <input type="hidden" name="payment_method" value="bank_transfer">
-                                    
-                                    <div class="mb-3">
-                                        <label class="form-label">Bank Asal *</label>
-                                        <select class="form-select" name="sender_bank" required>
-                                            <option value="">Pilih Bank</option>
-                                            <option value="BCA">BCA</option>
-                                            <option value="Mandiri">Mandiri</option>
-                                            <option value="BNI">BNI</option>
-                                            <option value="BRI">BRI</option>
-                                            <option value="Other">Lainnya</option>
-                                        </select>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label class="form-label">Nama Pengirim *</label>
-                                        <input type="text" 
-                                               class="form-control" 
-                                               name="sender_name"
-                                               placeholder="Nama sesuai rekening"
-                                               required>
-                                    </div>
-                                    
-                                    <div class="mb-3">
-                                        <label class="form-label">Bukti Transfer *</label>
-                                        <input type="file" 
-                                               class="form-control" 
-                                               name="payment_proof" 
-                                               accept="image/*"
-                                               required>
-                                        <small class="text-muted">Format: JPG, PNG (Max 2MB)</small>
-                                    </div>
-                                    
-                                    <button type="submit" class="btn btn-success btn-lg w-100">
-                                        <i class="bi bi-check-circle"></i> Konfirmasi Transfer Bank
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-
+              </div>
+              <div class="col-md-4">
+                <div class="payment-method <?= $paymentChannel==='va_bni' ? 'selected':'' ?>" data-channel="va_bni" onclick="selectPaymentMethod('va_bni')">
+                  <div class="text-center mb-2"><i class="bi bi-bank display-5 text-success"></i></div>
+                  <h6 class="fw-bold text-center mb-1">BNI VA</h6>
+                  <div class="text-muted small text-center">Virtual Account</div>
+                  <div class="text-muted small text-center">Transfer via BNI</div>
                 </div>
-
-                <!-- Order Summary Sidebar -->
-                <div class="col-lg-4">
-                    <div class="card shadow-sm sticky-top" style="top: 20px;">
-                        <div class="card-header bg-white">
-                            <h5 class="mb-0 fw-bold">
-                                <i class="bi bi-receipt"></i> Ringkasan Pesanan
-                            </h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="mb-3">
-                                <small class="text-muted">Order Number</small>
-                                <h6 class="fw-bold"><?= esc($orderNumber) ?></h6>
-                            </div>
-
-                            <div class="mb-3">
-                                <small class="text-muted">Layanan</small>
-                                <p class="mb-0 fw-bold"><?= esc($serviceName) ?></p>
-                            </div>
-
-                            <div class="mb-3">
-                                <small class="text-muted">Cabang</small>
-                                <p class="mb-0"><?= esc($branchName) ?></p>
-                            </div>
-
-                            <hr>
-
-                            <div class="d-flex justify-content-between mb-2">
-                                <span>Biaya Layanan</span>
-                                <strong><?= format_rupiah($totalPrice) ?></strong>
-                            </div>
-
-                            <div class="d-flex justify-content-between mb-2">
-                                <span>Pickup & Delivery</span>
-                                <strong class="text-success">GRATIS</strong>
-                            </div>
-
-                            <hr>
-
-                            <div class="d-flex justify-content-between align-items-center">
-                                <strong>Total Bayar</strong>
-                                <h4 class="text-primary mb-0 fw-bold">
-                                    <?= format_rupiah($totalPrice) ?>
-                                </h4>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Help Card -->
-                    <div class="card shadow-sm mt-3">
-                        <div class="card-body text-center">
-                            <i class="bi bi-headset fs-1 text-primary mb-2"></i>
-                            <h6 class="fw-bold">Butuh Bantuan?</h6>
-                            <p class="small text-muted mb-3">Hubungi customer service kami</p>
-                            <a href="https://wa.me/6281234567890?text=Halo,%20saya%20butuh%20bantuan%20untuk%20pembayaran%20<?= urlencode($orderNumber) ?>" 
-                               target="_blank" 
-                               class="btn btn-success btn-sm w-100">
-                                <i class="bi bi-whatsapp"></i> Chat WhatsApp
-                            </a>
-                        </div>
-                    </div>
+              </div>
+              <div class="col-md-4">
+                <div class="payment-method <?= $paymentChannel==='va_mandiri' ? 'selected':'' ?>" data-channel="va_mandiri" onclick="selectPaymentMethod('va_mandiri')">
+                  <div class="text-center mb-2"><i class="bi bi-bank display-5" style="color:#003d79;"></i></div>
+                  <h6 class="fw-bold text-center mb-1">Mandiri VA</h6>
+                  <div class="text-muted small text-center">Virtual Account</div>
+                  <div class="text-muted small text-center">Transfer via Mandiri</div>
                 </div>
+              </div>
             </div>
+
+            <div class="d-flex gap-2 mt-4">
+              <button class="btn btn-primary" type="button" onclick="createPayment()"><i class="bi bi-lock"></i> Buat Pembayaran</button>
+              <button class="btn btn-outline-secondary" type="button" onclick="manualRefreshStatus()"><i class="bi bi-arrow-clockwise"></i> Refresh Status</button>
+            </div>
+
+            <div class="alert alert-info mt-4 mb-0">
+              <i class="bi bi-info-circle"></i>
+              <small>Pilih metode lalu klik <strong>Buat Pembayaran</strong>. QR / VA akan muncul di bawah.</small>
+            </div>
+          </div>
         </div>
-    </section>
+
+        <!-- QRIS -->
+        <div class="card shadow-sm payment-details-card mb-4 <?= (!$hasPayment || $paymentChannel!=='qris') ? 'd-none':'' ?>" id="qrisDetails">
+          <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="bi bi-qr-code"></i> Pembayaran QRIS</h5>
+          </div>
+          <div class="card-body p-4 text-center">
+            <div class="fw-bold mb-2">Scan QRIS untuk Membayar</div>
+
+            <div class="qr-box">
+              <div id="qrisQrWrap" class="w-100 d-flex justify-content-center"></div>
+            </div>
+
+            <div id="qrisError" class="text-danger mt-2 small d-none">
+              Gagal memuat QR dari URL. (Fallback ke QR string jika tersedia) — klik Refresh Status.
+            </div>
+
+            <div class="alert alert-info text-start mt-3">
+              <div class="fw-bold">Total Pembayaran</div>
+              <div class="fs-4 fw-bold text-primary"><?= format_rupiah($totalPrice) ?></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- VA -->
+        <div class="card shadow-sm payment-details-card mb-4 <?= (!$hasPayment || !in_array($paymentChannel,['va_bni','va_mandiri'],true)) ? 'd-none':'' ?>" id="vaDetails">
+          <div class="card-header bg-success text-white">
+            <h5 class="mb-0"><i class="bi bi-bank"></i> Virtual Account <span id="vaBankName"></span></h5>
+          </div>
+          <div class="card-body p-4">
+            <div class="va-number-card mb-3">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="fw-bold">Nomor Virtual Account</div>
+                <button class="btn btn-light btn-sm" type="button" onclick="copyVANumber()"><i class="bi bi-clipboard"></i> Copy</button>
+              </div>
+              <div class="va-number" id="vaNumberDisplay"><?= $vaNumber ? esc($vaNumber) : 'Loading...' ?></div>
+              <div class="small text-muted">a.n. <strong>Tapak Bersih</strong></div>
+            </div>
+
+            <div class="alert alert-info">
+              <div class="fw-bold">Total Transfer</div>
+              <div class="fs-4 fw-bold text-primary"><?= format_rupiah($totalPrice) ?></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="col-lg-4">
+        <div class="card shadow-sm sticky-top" style="top:20px;">
+          <div class="card-header bg-white border-bottom">
+            <h5 class="mb-0 fw-bold"><i class="bi bi-receipt"></i> Ringkasan Pesanan</h5>
+          </div>
+          <div class="card-body">
+            <div class="mb-2"><small class="text-muted">Order Number</small><div class="fw-bold"><?= esc($orderNumber) ?></div></div>
+            <hr>
+            <div class="d-flex justify-content-between"><span>Total</span><strong><?= format_rupiah($totalPrice) ?></strong></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
 
 <?php else: ?>
-    <!-- No Order State -->
-    <section class="py-5">
-        <div class="container">
-            <div class="text-center py-5">
-                <i class="bi bi-inbox display-1 text-muted"></i>
-                <h2 class="mt-3">Pesanan Tidak Ditemukan</h2>
-                <p class="text-muted">Pesanan yang Anda cari tidak ditemukan atau sudah tidak valid.</p>
-                <a href="<?= base_url('/') ?>" class="btn btn-primary mt-3">
-                    <i class="bi bi-house"></i> Kembali ke Beranda
-                </a>
-            </div>
-        </div>
-    </section>
+<section class="py-5"><div class="container text-center py-5"><h2>Pesanan Tidak Ditemukan</h2></div></section>
 <?php endif; ?>
 
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<!-- SweetAlert2 JS -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 
 <script>
-const BASE_URL = '<?= base_url() ?>';
-const ORDER_NUMBER = '<?= $orderNumber ?? '' ?>';
-let selectedMethod = null;
+const BASE_URL     = '<?= rtrim(base_url(), '/') ?>';
+const ORDER_NUMBER = '<?= esc($orderNumber ?? '') ?>';
+let selectedChannel = '<?= esc($paymentChannel ?? 'qris') ?>';
+let lastKnownStatus = null;
+let statusTimer = null;
 
-// Select payment method - ONLY show ONE at a time
-function selectPaymentMethod(method) {
-    selectedMethod = method;
-    
-    // Remove selected from all payment method cards
-    document.querySelectorAll('.payment-method').forEach(m => {
-        m.classList.remove('selected');
-    });
-    
-    // Add selected to clicked method
-    const selectedCard = document.querySelector(`.payment-method[data-method="${method}"]`);
-    if (selectedCard) {
-        selectedCard.classList.add('selected');
-        const radio = selectedCard.querySelector('input[type="radio"]');
-        if (radio) radio.checked = true;
-    }
-    
-    // HIDE ALL payment detail cards first
-    document.getElementById('qrisDetails').classList.add('d-none');
-    document.getElementById('bankTransferDetails').classList.add('d-none');
-    
-    // Show ONLY the selected method details
-    if (method === 'qris') {
-        document.getElementById('qrisDetails').classList.remove('d-none');
-    } else if (method === 'bank_transfer') {
-        document.getElementById('bankTransferDetails').classList.remove('d-none');
-    }
-    
-    // Smooth scroll to the details card
-    setTimeout(() => {
-        const detailsCard = method === 'qris' 
-            ? document.getElementById('qrisDetails')
-            : document.getElementById('bankTransferDetails');
-        if (detailsCard) {
-            detailsCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-    }, 100);
+function getUnifiedStatus(payment) {
+  if (!payment) return null;
+
+  // status lokal dari DB payment
+  const s1 = payment.status ? String(payment.status).toLowerCase() : null;
+
+  // status dari midtrans (raw_response.transaction_status)
+  const s2 = payment.transaction_status ? String(payment.transaction_status).toLowerCase() : null;
+
+  // Prioritaskan midtrans transaction_status jika ada
+  return s2 || s1;
 }
 
-// Copy text function
-function copyText(text) {
-    navigator.clipboard.writeText(text).then(() => {
-        Swal.fire({
-            icon: 'success',
-            title: 'Berhasil!',
-            text: 'Nomor rekening berhasil disalin',
-            timer: 1500,
-            showConfirmButton: false
-        });
-    }).catch(() => {
-        // Fallback
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-        
-        Swal.fire({
-            icon: 'success',
-            title: 'Berhasil!',
-            text: 'Nomor rekening berhasil disalin',
-            timer: 1500,
-            showConfirmButton: false
-        });
-    });
+function isPaidStatus(status) {
+  if (!status) return false;
+  const s = String(status).toLowerCase();
+  // Midtrans paid-like: settlement/capture (credit card)/success/paid
+  return ['settlement', 'capture', 'paid', 'success'].includes(s);
 }
 
-// QRIS form submission
-document.getElementById('qrisProofForm')?.addEventListener('submit', async function(e) {
-    e.preventDefault();
-    await submitPaymentProof(this);
-});
+function isFailedStatus(status) {
+  if (!status) return false;
+  const s = String(status).toLowerCase();
+  return ['expire', 'expired', 'cancel', 'canceled', 'deny', 'failure', 'failed'].includes(s);
+}
 
-// Transfer form submission
-document.getElementById('transferProofForm')?.addEventListener('submit', async function(e) {
-    e.preventDefault();
-    await submitPaymentProof(this);
-});
+async function handleStatusChange(payment) {
+  const currentStatus = getUnifiedStatus(payment);
 
-async function submitPaymentProof(form) {
-    const formData = new FormData(form);
-    const submitBtn = form.querySelector('button[type="submit"]');
-    const originalBtnText = submitBtn.innerHTML;
-    
-    // Client-side validation
-    const paymentProof = form.querySelector('input[name="payment_proof"]');
-    if (!paymentProof || !paymentProof.files || paymentProof.files.length === 0) {
-        Swal.fire({
-            icon: 'error',
-            title: 'Oops!',
-            text: 'Silakan upload bukti pembayaran'
-        });
-        return;
-    }
-    
-    // Check file size (max 2MB)
-    if (paymentProof.files[0].size > 2 * 1024 * 1024) {
-        Swal.fire({
-            icon: 'error',
-            title: 'File Terlalu Besar',
-            text: 'Ukuran file maksimal 2MB'
-        });
-        return;
-    }
-    
-    // For bank transfer, validate additional fields
-    const paymentMethod = formData.get('payment_method');
-    if (paymentMethod === 'bank_transfer') {
-        const senderBank = form.querySelector('select[name="sender_bank"]');
-        const senderName = form.querySelector('input[name="sender_name"]');
-        
-        if (!senderBank || !senderBank.value) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Oops!',
-                text: 'Silakan pilih bank asal'
-            });
-            return;
-        }
-        
-        if (!senderName || !senderName.value || senderName.value.length < 3) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Oops!',
-                text: 'Nama pengirim wajib diisi (minimal 3 karakter)'
-            });
-            return;
-        }
-    }
-    
-    // Disable button and show loading
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Memproses...';
-    
+  // pertama kali set baseline
+  if (lastKnownStatus === null) {
+    lastKnownStatus = currentStatus;
+    return;
+  }
+
+  // kalau status tidak berubah, skip
+  if (currentStatus === lastKnownStatus) return;
+
+  // update status terakhir
+  lastKnownStatus = currentStatus;
+
+  // Paid -> popup + redirect
+  if (isPaidStatus(currentStatus)) {
+    await Swal.fire({
+      icon: 'success',
+      title: 'Pembayaran Berhasil',
+      text: 'Pembayaran kamu sudah terkonfirmasi. Terima kasih!',
+      confirmButtonText: 'Lihat Detail'
+    });
+    window.location.href = `${BASE_URL}/payment/${encodeURIComponent(ORDER_NUMBER)}/success`;
+    return;
+  }
+
+  // Failed -> popup
+  if (isFailedStatus(currentStatus)) {
+    Swal.fire({
+      icon: 'error',
+      title: 'Pembayaran Gagal',
+      text: `Status pembayaran: ${currentStatus}`,
+    });
+  } else {
+    // status lain (pending, etc)
+    Swal.fire({
+      icon: 'info',
+      title: 'Status Diperbarui',
+      text: `Status sekarang: ${currentStatus}`,
+      timer: 1200,
+      showConfirmButton: false
+    });
+  }
+}
+
+function selectPaymentMethod(channel) {
+  selectedChannel = channel;
+  document.querySelectorAll('.payment-method').forEach(m => m.classList.remove('selected'));
+  document.querySelector(`.payment-method[data-channel="${channel}"]`)?.classList.add('selected');
+}
+
+async function createPayment() {
+  const overlay = document.getElementById('loadingOverlay');
+  overlay.classList.add('active');
+
+  try {
+    const resp = await fetch(`${BASE_URL}/payment/${encodeURIComponent(ORDER_NUMBER)}/pay`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ channel: selectedChannel })
+    });
+
+    const result = await resp.json();
+    if (!result.success || !result.payment) throw new Error(result.message || 'Gagal membuat pembayaran');
+
+    displayPaymentDetails(result.payment);
+
+    Swal.fire({ icon:'success', title:'Berhasil!', text:'Silakan lanjutkan pembayaran.', timer:1200, showConfirmButton:false });
+  } catch (e) {
+    console.error(e);
+    Swal.fire({ icon:'error', title:'Gagal', text: e.message || 'Terjadi kesalahan' });
+  } finally {
+    overlay.classList.remove('active');
+  }
+}
+
+function extractQrString(payment) {
+  if (payment.qr_string) return payment.qr_string;
+  if (payment.raw_response && typeof payment.raw_response === 'string') {
+    try { const obj = JSON.parse(payment.raw_response); if (obj?.qr_string) return obj.qr_string; } catch(e){}
+  }
+  return null;
+}
+
+function extractQrisPayload(payment) {
+  if (payment.qris_payload) return payment.qris_payload;
+  if (payment.raw_response && typeof payment.raw_response === 'string') {
     try {
-        const response = await fetch(`${BASE_URL}/payment/${ORDER_NUMBER}/confirm`, {
-            method: 'POST',
-            body: formData
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            Swal.fire({
-                icon: 'success',
-                title: 'Berhasil!',
-                text: result.message || 'Bukti pembayaran berhasil diupload',
-                confirmButtonColor: '#667eea'
-            }).then(() => {
-                if (result.redirect) {
-                    window.location.href = result.redirect;
-                }
-            });
-        } else {
-            let errorMessage = result.message || 'Gagal mengupload bukti pembayaran';
-            
-            if (result.errors) {
-                const errorMessages = [];
-                for (const [field, messages] of Object.entries(result.errors)) {
-                    const msg = Array.isArray(messages) ? messages[0] : messages;
-                    errorMessages.push(`• ${msg}`);
-                }
-                errorMessage = errorMessages.join('<br>');
-            }
-            
-            Swal.fire({
-                icon: 'error',
-                title: 'Gagal!',
-                html: errorMessage
-            });
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        Swal.fire({
-            icon: 'error',
-            title: 'Oops!',
-            text: 'Terjadi kesalahan. Silakan coba lagi.'
-        });
-    } finally {
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = originalBtnText;
+      const obj = JSON.parse(payment.raw_response);
+      if (obj?.actions?.length) {
+        const gen = obj.actions.find(a => a.name === 'generate-qr-code' && a.url);
+        if (gen?.url) return gen.url;
+        const any = obj.actions.find(a => a.url && String(a.url).includes('/qr-code'));
+        if (any?.url) return any.url;
+      }
+    } catch(e){}
+  }
+  return null;
+}
+
+function renderQrFromUrl(url, fallbackQrString) {
+  const wrap = document.getElementById('qrisQrWrap');
+  const err  = document.getElementById('qrisError');
+  wrap.innerHTML = '';
+  err.classList.add('d-none');
+
+  if (!url) {
+    // langsung fallback ke string
+    return renderQrFromString(fallbackQrString);
+  }
+
+  // cache-busting biar selalu load fresh
+  const bust = (url.includes('?') ? '&' : '?') + 't=' + Date.now();
+  const finalUrl = url + bust;
+
+  const img = document.createElement('img');
+  img.className = 'qr-img';
+  img.alt = 'QRIS QR Code';
+  img.referrerPolicy = 'no-referrer';
+  img.src = finalUrl;
+
+  img.onload = () => { /* ok */ };
+  img.onerror = () => {
+    // kalau URL gagal → fallback ke qr_string
+    err.classList.remove('d-none');
+    renderQrFromString(fallbackQrString);
+  };
+
+  wrap.appendChild(img);
+}
+
+function renderQrFromString(qrString) {
+  const wrap = document.getElementById('qrisQrWrap');
+  wrap.innerHTML = '';
+  if (!qrString) return;
+
+  // QRCodeJS render
+  new QRCode(wrap, {
+    text: qrString,
+    width: 260,
+    height: 260,
+    correctLevel: QRCode.CorrectLevel.M
+  });
+}
+
+function extractVaNumber(payment) {
+  if (payment.va_number) return payment.va_number;
+  if (payment.raw_response && typeof payment.raw_response === 'string') {
+    try {
+      const obj = JSON.parse(payment.raw_response);
+      if (obj?.permata_va_number) return obj.permata_va_number;
+      if (obj?.va_numbers?.[0]?.va_number) return obj.va_numbers[0].va_number;
+    } catch(e){}
+  }
+  return null;
+}
+
+function displayPaymentDetails(payment) {
+  const channel = payment.channel;
+
+  document.getElementById('qrisDetails')?.classList.add('d-none');
+  document.getElementById('vaDetails')?.classList.add('d-none');
+
+  if (channel === 'qris') {
+    document.getElementById('qrisDetails')?.classList.remove('d-none');
+
+    const payload = extractQrisPayload(payment);
+    const qrStr   = extractQrString(payment);
+
+    // PRIORITAS: render dari qris_payload URL
+    renderQrFromUrl(payload, qrStr);
+
+    document.getElementById('qrisDetails')?.scrollIntoView({behavior:'smooth', block:'start'});
+    return;
+  }
+
+  if (channel === 'va_bni' || channel === 'va_mandiri') {
+    document.getElementById('vaDetails')?.classList.remove('d-none');
+    document.getElementById('vaBankName').textContent = channel === 'va_bni' ? 'BNI' : 'Mandiri';
+
+    const va = extractVaNumber(payment);
+    if (va) document.getElementById('vaNumberDisplay').textContent = va;
+
+    document.getElementById('vaDetails')?.scrollIntoView({behavior:'smooth', block:'start'});
+    return;
+  }
+
+  Swal.fire({ icon:'warning', title:'Metode tidak didukung', text:'Channel pembayaran tidak dikenali.' });
+}
+
+function copyVANumber() {
+  const va = document.getElementById('vaNumberDisplay')?.textContent?.trim().replace(/\s/g,'') || '';
+  if (!va) return;
+  navigator.clipboard.writeText(va).then(() => {
+    Swal.fire({ icon:'success', title:'Tersalin', text:'Nomor VA berhasil disalin', timer:1000, showConfirmButton:false });
+  });
+}
+
+async function manualRefreshStatus() {
+  try {
+    const url = `${BASE_URL}/payment/${encodeURIComponent(ORDER_NUMBER)}/status?t=${Date.now()}`; // cache busting
+    const resp = await fetch(url, { cache: 'no-store' });
+    const result = await resp.json();
+
+    if (!result.success || !result.payment) {
+      Swal.fire({ icon:'warning', title:'Gagal', text: result.message || 'Gagal mengambil status' });
+      return;
     }
+
+    // Update tampilan detail pembayaran (QR/VA)
+    displayPaymentDetails(result.payment);
+
+    // Cek perubahan status & munculkan popup kalau paid/fail
+    await handleStatusChange(result.payment);
+
+  } catch (e) {
+    console.error(e);
+    Swal.fire({ icon:'error', title:'Error', text:'Gagal mengambil status (cek endpoint /status).' });
+  }
 }
 
-// Countdown timer
-function startCountdown() {
-    const endTime = new Date().getTime() + (24 * 60 * 60 * 1000);
-    
-    const timer = setInterval(() => {
-        const now = new Date().getTime();
-        const distance = endTime - now;
-        
-        if (distance < 0) {
-            clearInterval(timer);
-            document.getElementById('countdown').innerHTML = "EXPIRED";
-            Swal.fire({
-                icon: 'warning',
-                title: 'Waktu Habis',
-                text: 'Waktu pembayaran telah habis.',
-                confirmButtonColor: '#667eea'
-            });
-            return;
+
+function startAutoPolling() {
+  // polling tiap 6 detik
+  if (statusTimer) clearInterval(statusTimer);
+
+  statusTimer = setInterval(async () => {
+    try {
+      const url = `${BASE_URL}/payment/${encodeURIComponent(ORDER_NUMBER)}/status?t=${Date.now()}`;
+      const resp = await fetch(url, { cache: 'no-store' });
+      const result = await resp.json();
+      if (result.success && result.payment) {
+        // update detail (optional)
+        displayPaymentDetails(result.payment);
+
+        // cek paid/failed
+        await handleStatusChange(result.payment);
+
+        // stop polling kalau sudah paid/failed
+        const st = getUnifiedStatus(result.payment);
+        if (isPaidStatus(st) || isFailedStatus(st)) {
+          clearInterval(statusTimer);
+          statusTimer = null;
         }
-        
-        const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-        
-        document.getElementById('countdown').innerHTML = 
-            `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    }, 1000);
+      }
+    } catch (e) {
+      // kalau error, biarin aja polling lanjut (tidak spam popup)
+      console.warn('polling error', e);
+    }
+  }, 6000);
 }
 
-// Start countdown on page load
-if (document.getElementById('countdown')) {
-    startCountdown();
-}
+document.addEventListener('DOMContentLoaded', () => {
+  // baseline status awal dari PHP (kalau payment sudah ada)
+  <?php if (!empty($payment)): ?>
+    try {
+      const initialPayment = <?= json_encode($payment) ?>;
+      lastKnownStatus = getUnifiedStatus(initialPayment);
+    } catch (e) {}
+  <?php endif; ?>
+
+  startAutoPolling();
+});
+
 </script>
 <?= $this->endSection() ?>

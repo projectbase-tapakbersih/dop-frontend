@@ -47,7 +47,7 @@ class CheckoutController extends BaseController
         $serviceId = $this->request->getGet('service');
         if ($serviceId && !empty($data['services'])) {
             foreach ($data['services'] as $service) {
-                if ($service['id'] == $serviceId) {
+                if (($service['id'] ?? null) == $serviceId) {
                     $data['selected_service'] = $service;
                     break;
                 }
@@ -58,7 +58,7 @@ class CheckoutController extends BaseController
         $branchId = $this->request->getGet('branch');
         if ($branchId && !empty($data['branches'])) {
             foreach ($data['branches'] as $branch) {
-                if ($branch['id'] == $branchId) {
+                if (($branch['id'] ?? null) == $branchId) {
                     $data['selected_branch'] = $branch;
                     break;
                 }
@@ -70,13 +70,10 @@ class CheckoutController extends BaseController
             $userData = function_exists('get_user_data') ? get_user_data() : null;
             $data['user'] = is_array($userData) ? $userData : null;
             $data['is_guest'] = false;
-        } elseif (function_exists('is_guest') && is_guest()) {
-            $userData = function_exists('get_user_data') ? get_user_data() : null;
-            $data['user'] = is_array($userData) ? $userData : null;
-            $data['is_guest'] = true;
         } else {
+            // Guest = not logged in
             $data['user'] = null;
-            $data['is_guest'] = false;
+            $data['is_guest'] = true;
         }
 
         return view('order/create', $data);
@@ -89,7 +86,6 @@ class CheckoutController extends BaseController
      */
     public function processCheckout()
     {
-        // Double check login status
         if (!is_logged_in()) {
             return $this->response->setJSON([
                 'success' => false,
@@ -99,7 +95,6 @@ class CheckoutController extends BaseController
             ]);
         }
 
-        // Validation
         $rules = [
             'name' => 'required|min_length[3]',
             'phone' => 'required|min_length[10]',
@@ -121,8 +116,7 @@ class CheckoutController extends BaseController
             ]);
         }
 
-        // Prepare checkout data sesuai format API
-        $data = [
+        $payload = [
             'guest_name' => $this->request->getPost('name'),
             'guest_phone' => $this->request->getPost('phone'),
             'branch_id' => (int) $this->request->getPost('branch_id'),
@@ -132,7 +126,7 @@ class CheckoutController extends BaseController
             'pickup_date' => $this->request->getPost('pickup_date'),
             'pickup_time' => $this->request->getPost('pickup_time'),
             'plastic_bag_confirmed' => $this->request->getPost('plastic_bag_confirmed') === 'true' || $this->request->getPost('plastic_bag_confirmed') === '1',
-            'payment_method' => $this->request->getPost('payment_method'),
+            'payment_method' => $this->request->getPost('payment_method'), // (qris/transfer) — detail channel dipilih di halaman payment
             'items' => [
                 [
                     'service_id' => (int) $this->request->getPost('service_id'),
@@ -144,22 +138,36 @@ class CheckoutController extends BaseController
             ]
         ];
 
-        log_message('info', 'User Checkout Request: ' . json_encode($data));
+        log_message('info', 'User Checkout Request: ' . json_encode($payload));
 
-        // API: POST /api/user/checkout
-        $response = api_request('/user/checkout', 'POST', $data, true);
+        $response = api_request('/user/checkout', 'POST', $payload, true);
 
         log_message('info', 'User Checkout Response: ' . json_encode($response));
 
+        // ✅ Normalisasi order_number dari berbagai kemungkinan response:
+        // - { success:true, data:{order_number:"TB-..."} }
+        // - { success:true, order_number:"TB-..." }
+        // - { success:true, order_number:"TB-...", total_amount:... } (seperti Postman kamu)
         if (isset($response['success']) && $response['success']) {
-            $orderData = $response['data'] ?? [];
-            $orderNumber = is_array($orderData) ? ($orderData['order_number'] ?? null) : null;
-            
+            $orderNumber =
+                ($response['data']['order_number'] ?? null)
+                ?? ($response['order_number'] ?? null)
+                ?? (($response['data']['orderNumber'] ?? null));
+
+            if (!$orderNumber) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'Checkout sukses, tetapi order number tidak ditemukan dari response API.'
+                ]);
+            }
+
+            // ✅ Redirect langsung ke halaman payment
             return $this->response->setJSON([
                 'success' => true,
                 'message' => 'Pesanan berhasil dibuat!',
-                'data' => $orderData,
-                'redirect' => base_url('user/orders/' . $orderNumber)
+                'data' => $response['data'] ?? $response,
+                'order_number' => $orderNumber,
+                'redirect' => base_url('payment/' . $orderNumber)
             ]);
         }
 
@@ -198,8 +206,7 @@ class CheckoutController extends BaseController
             ]);
         }
 
-        // Prepare guest checkout data
-        $data = [
+        $payload = [
             'guest_name' => $this->request->getPost('name'),
             'guest_phone' => $this->request->getPost('phone'),
             'branch_id' => (int) $this->request->getPost('branch_id'),
@@ -221,26 +228,36 @@ class CheckoutController extends BaseController
             ]
         ];
 
-        log_message('info', 'Guest Checkout Request: ' . json_encode($data));
+        log_message('info', 'Guest Checkout Request: ' . json_encode($payload));
 
-        // API: POST /api/guest/orders
-        $response = api_request('/guest/orders', 'POST', $data);
+        $response = api_request('/guest/orders', 'POST', $payload);
 
         log_message('info', 'Guest Checkout Response: ' . json_encode($response));
 
         if (isset($response['success']) && $response['success']) {
-            $orderData = $response['data'] ?? [];
-            $orderNumber = is_array($orderData) ? ($orderData['order_number'] ?? null) : null;
-            
-            // Store order number in session for guest tracking
+            $orderNumber =
+                ($response['data']['order_number'] ?? null)
+                ?? ($response['order_number'] ?? null)
+                ?? (($response['data']['orderNumber'] ?? null));
+
+            if (!$orderNumber) {
+                return $this->response->setJSON([
+                    'success' => false,
+                    'message' => 'Checkout sukses, tetapi order number tidak ditemukan dari response API.'
+                ]);
+            }
+
+            // ✅ Simpan untuk tracking guest
             session()->set('guest_order_number', $orderNumber);
             session()->set('guest_phone', $this->request->getPost('phone'));
-            
+
+            // ✅ Redirect langsung ke halaman payment
             return $this->response->setJSON([
                 'success' => true,
                 'message' => 'Pesanan berhasil dibuat!',
-                'data' => $orderData,
-                'redirect' => base_url('guest/order/' . $orderNumber)
+                'data' => $response['data'] ?? $response,
+                'order_number' => $orderNumber,
+                'redirect' => base_url('payment/' . $orderNumber)
             ]);
         }
 
