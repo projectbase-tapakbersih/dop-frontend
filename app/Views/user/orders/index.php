@@ -1,12 +1,59 @@
 <?= $this->extend('layouts/main') ?>
 
 <?php
-// Helper function
-if (!function_exists('format_rupiah')) {
-    function format_rupiah($number) {
-        return 'Rp ' . number_format((float)$number, 0, ',', '.');
-    }
+helper('format');
+
+// Status configuration sesuai Laravel database enum
+$statusOptions = [
+    'waiting_pickup' => 'Menunggu Penjemputan',
+    'dalam_penjemputan' => 'Dalam Penjemputan',
+    'in_progress' => 'Sedang Diproses',
+    'ready_for_delivery' => 'Siap Diantar',
+    'on_delivery' => 'Dalam Pengiriman',
+    'completed' => 'Selesai',
+    'cancelled' => 'Dibatalkan'
+];
+
+function getStatusBadgeClass($status) {
+    $classes = [
+        'waiting_pickup' => 'warning text-dark',
+        'dalam_penjemputan' => 'info',
+        'in_progress' => 'primary',
+        'ready_for_delivery' => 'success',
+        'on_delivery' => 'info',
+        'completed' => 'success',
+        'cancelled' => 'danger'
+    ];
+    return $classes[$status] ?? 'secondary';
 }
+
+function getStatusLabel($status) {
+    $labels = [
+        'waiting_pickup' => 'Menunggu Pickup',
+        'dalam_penjemputan' => 'Dalam Penjemputan',
+        'in_progress' => 'Diproses',
+        'ready_for_delivery' => 'Siap Antar',
+        'on_delivery' => 'Dikirim',
+        'completed' => 'Selesai',
+        'cancelled' => 'Dibatalkan'
+    ];
+    return $labels[$status] ?? ucfirst(str_replace('_', ' ', $status));
+}
+
+function getStatusIcon($status) {
+    $icons = [
+        'waiting_pickup' => 'hourglass-split',
+        'dalam_penjemputan' => 'truck',
+        'in_progress' => 'gear-fill',
+        'ready_for_delivery' => 'box-seam',
+        'on_delivery' => 'bicycle',
+        'completed' => 'check-circle-fill',
+        'cancelled' => 'x-circle-fill'
+    ];
+    return $icons[$status] ?? 'circle';
+}
+
+$orders = $orders ?? [];
 ?>
 
 <?= $this->section('content') ?>
@@ -14,10 +61,17 @@ if (!function_exists('format_rupiah')) {
 <!-- Page Header -->
 <section class="py-4 bg-primary text-white">
     <div class="container">
-        <h2 class="mb-0 fw-bold">
-            <i class="bi bi-box-seam"></i> Pesanan Saya
-        </h2>
-        <p class="mb-0 mt-1 opacity-75">Lihat dan kelola semua pesanan Anda</p>
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h2 class="mb-0 fw-bold">
+                    <i class="bi bi-box-seam"></i> Pesanan Saya
+                </h2>
+                <p class="mb-0 mt-1 opacity-75">Lihat dan kelola semua pesanan Anda</p>
+            </div>
+            <a href="<?= base_url('order/checkout') ?>" class="btn btn-light">
+                <i class="bi bi-plus-lg"></i> Pesanan Baru
+            </a>
+        </div>
     </div>
 </section>
 
@@ -43,7 +97,7 @@ if (!function_exists('format_rupiah')) {
                     <i class="bi bi-inbox fs-1 text-muted mb-3 d-block"></i>
                     <h4 class="text-muted">Belum Ada Pesanan</h4>
                     <p class="text-muted mb-4">Anda belum memiliki pesanan. Mulai pesan layanan sekarang!</p>
-                    <a href="<?= base_url('order/create') ?>" class="btn btn-primary">
+                    <a href="<?= base_url('order/checkout') ?>" class="btn btn-primary">
                         <i class="bi bi-plus-lg"></i> Buat Pesanan Baru
                     </a>
                 </div>
@@ -63,10 +117,9 @@ if (!function_exists('format_rupiah')) {
                         <div class="col-md-4">
                             <select class="form-select" id="statusFilter">
                                 <option value="">Semua Status</option>
-                                <option value="waiting_pickup">Waiting Pickup</option>
-                                <option value="in_process">In Process</option>
-                                <option value="completed">Completed</option>
-                                <option value="cancelled">Cancelled</option>
+                                <?php foreach ($statusOptions as $value => $label): ?>
+                                    <option value="<?= $value ?>"><?= $label ?></option>
+                                <?php endforeach; ?>
                             </select>
                         </div>
                     </div>
@@ -77,75 +130,75 @@ if (!function_exists('format_rupiah')) {
             <div class="row g-4" id="ordersList">
                 <?php foreach ($orders as $order): ?>
                     <?php
-                    $status = $order['order_status'] ?? 'pending';
+                    $status = $order['order_status'] ?? 'waiting_pickup';
                     $paymentStatus = $order['payment_status'] ?? 'pending';
-                    
-                    $statusConfig = [
-                        'waiting_pickup' => ['badge' => 'warning', 'label' => 'Menunggu Pickup', 'icon' => 'hourglass-split'],
-                        'picked_up' => ['badge' => 'info', 'label' => 'Sudah Dijemput', 'icon' => 'truck'],
-                        'in_process' => ['badge' => 'primary', 'label' => 'Diproses', 'icon' => 'gear'],
-                        'processing' => ['badge' => 'primary', 'label' => 'Diproses', 'icon' => 'gear'],
-                        'washing' => ['badge' => 'primary', 'label' => 'Dicuci', 'icon' => 'droplet'],
-                        'drying' => ['badge' => 'primary', 'label' => 'Dikeringkan', 'icon' => 'wind'],
-                        'quality_check' => ['badge' => 'info', 'label' => 'Quality Check', 'icon' => 'check2-square'],
-                        'ready' => ['badge' => 'success', 'label' => 'Siap Diantar', 'icon' => 'check-circle'],
-                        'on_delivery' => ['badge' => 'info', 'label' => 'Diantar', 'icon' => 'bicycle'],
-                        'completed' => ['badge' => 'success', 'label' => 'Selesai', 'icon' => 'trophy'],
-                        'cancelled' => ['badge' => 'danger', 'label' => 'Dibatalkan', 'icon' => 'x-circle']
-                    ];
-                    $statusInfo = $statusConfig[$status] ?? ['badge' => 'secondary', 'label' => ucfirst($status), 'icon' => 'circle'];
                     
                     // Get service names
                     $services = [];
                     if (!empty($order['items'])) {
                         foreach ($order['items'] as $item) {
-                            $services[] = $item['service']['name'] ?? 'Service';
+                            $serviceName = $item['service']['name'] ?? $item['service_name'] ?? 'Layanan';
+                            $services[] = $serviceName;
                         }
                     }
                     ?>
                     <div class="col-12 order-item" 
-                         data-status="<?= $status ?>" 
+                         data-status="<?= esc($status) ?>" 
                          data-search="<?= strtolower($order['order_number'] ?? '') ?>">
-                        <div class="card shadow-sm">
+                        <div class="card shadow-sm hover-shadow">
                             <div class="card-body">
                                 <div class="row align-items-center">
-                                    <div class="col-md-6">
-                                        <div class="d-flex align-items-center mb-2">
-                                            <span class="badge bg-<?= $statusInfo['badge'] ?> me-2">
-                                                <i class="bi bi-<?= $statusInfo['icon'] ?>"></i> <?= $statusInfo['label'] ?>
+                                    <div class="col-md-5">
+                                        <div class="d-flex align-items-center gap-2 mb-2">
+                                            <span class="badge bg-<?= getStatusBadgeClass($status) ?>">
+                                                <i class="bi bi-<?= getStatusIcon($status) ?>"></i> <?= getStatusLabel($status) ?>
                                             </span>
-                                            <span class="badge bg-<?= $paymentStatus === 'paid' ? 'success' : 'warning' ?>">
+                                            <span class="badge bg-<?= $paymentStatus === 'paid' ? 'success' : 'warning text-dark' ?>">
                                                 <?= $paymentStatus === 'paid' ? 'Lunas' : 'Belum Bayar' ?>
                                             </span>
                                         </div>
-                                        <h5 class="fw-bold text-primary mb-1"><?= esc($order['order_number']) ?></h5>
-                                        <p class="text-muted mb-0">
-                                            <small>
-                                                <i class="bi bi-calendar"></i> <?= date('d M Y, H:i', strtotime($order['created_at'])) ?>
-                                            </small>
+                                        <h5 class="fw-bold text-primary mb-1"><?= esc($order['order_number'] ?? '-') ?></h5>
+                                        <p class="text-muted mb-0 small">
+                                            <i class="bi bi-calendar"></i> 
+                                            <?= !empty($order['created_at']) ? date('d M Y, H:i', strtotime($order['created_at'])) : '-' ?>
                                         </p>
                                     </div>
-                                    <div class="col-md-3">
-                                        <small class="text-muted">Layanan:</small>
-                                        <p class="mb-0 fw-bold"><?= esc(implode(', ', array_slice($services, 0, 2))) ?></p>
-                                        <small class="text-muted">Total:</small>
-                                        <p class="mb-0 fw-bold text-primary"><?= format_rupiah($order['total_amount'] ?? 0) ?></p>
+                                    <div class="col-md-4 my-2 my-md-0">
+                                        <small class="text-muted d-block">Layanan:</small>
+                                        <p class="mb-1 fw-semibold">
+                                            <?= esc(implode(', ', array_slice($services, 0, 2))) ?>
+                                            <?php if (count($services) > 2): ?>
+                                                <span class="text-muted">+<?= count($services) - 2 ?> lainnya</span>
+                                            <?php endif; ?>
+                                        </p>
+                                        <small class="text-muted d-block">Total:</small>
+                                        <p class="mb-0 fw-bold text-primary fs-5"><?= format_rupiah($order['total_amount'] ?? 0) ?></p>
                                     </div>
                                     <div class="col-md-3 text-md-end mt-3 mt-md-0">
-                                        <a href="<?= base_url('user/orders/' . $order['order_number']) ?>" class="btn btn-outline-primary">
-                                            <i class="bi bi-eye"></i> Detail
-                                        </a>
-                                        <?php if ($paymentStatus !== 'paid' && !in_array($status, ['completed', 'cancelled'])): ?>
-                                            <a href="<?= base_url('payment/' . $order['order_number']) ?>" class="btn btn-success">
-                                                <i class="bi bi-credit-card"></i> Bayar
+                                        <div class="d-flex gap-2 justify-content-md-end">
+                                            <a href="<?= base_url('user/orders/' . ($order['order_number'] ?? '')) ?>" 
+                                               class="btn btn-outline-primary">
+                                                <i class="bi bi-eye"></i> Detail
                                             </a>
-                                        <?php endif; ?>
+                                            <?php if ($paymentStatus !== 'paid' && !in_array($status, ['completed', 'cancelled'])): ?>
+                                                <a href="<?= base_url('payment/' . ($order['order_number'] ?? '')) ?>" 
+                                                   class="btn btn-success">
+                                                    <i class="bi bi-credit-card"></i> Bayar
+                                                </a>
+                                            <?php endif; ?>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 <?php endforeach; ?>
+            </div>
+
+            <!-- No Results Message -->
+            <div id="noResults" class="text-center py-5 d-none">
+                <i class="bi bi-search fs-1 text-muted d-block mb-2"></i>
+                <p class="text-muted">Tidak ada pesanan yang ditemukan</p>
             </div>
             
         <?php endif; ?>
@@ -163,23 +216,25 @@ function filterOrders() {
     const search = document.getElementById('searchInput').value.toLowerCase();
     const status = document.getElementById('statusFilter').value;
     
+    let visibleCount = 0;
+    
     document.querySelectorAll('.order-item').forEach(item => {
         const itemSearch = item.dataset.search;
         const itemStatus = item.dataset.status;
         
         let show = true;
         if (search && !itemSearch.includes(search)) show = false;
-        if (status) {
-            if (status === 'in_process') {
-                const processStatuses = ['in_process', 'picked_up', 'washing', 'drying', 'quality_check', 'ready', 'on_delivery'];
-                if (!processStatuses.includes(itemStatus)) show = false;
-            } else if (itemStatus !== status) {
-                show = false;
-            }
-        }
+        if (status && itemStatus !== status) show = false;
         
         item.style.display = show ? '' : 'none';
+        if (show) visibleCount++;
     });
+    
+    // Show/hide no results message
+    const noResults = document.getElementById('noResults');
+    if (noResults) {
+        noResults.classList.toggle('d-none', visibleCount > 0);
+    }
 }
 </script>
 <?= $this->endSection() ?>

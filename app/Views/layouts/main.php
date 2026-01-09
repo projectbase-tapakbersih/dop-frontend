@@ -323,41 +323,45 @@
                     <?php if (is_logged_in()): ?>
                         <?php $user = get_user_data(); ?>
                         
-                        <!-- Orders Link (Customer Only) -->
-                        <?php if (!is_admin()): ?>
-                            <li class="nav-item">
-                                <a class="nav-link <?= strpos(uri_string(), 'user/orders') !== false ? 'active' : '' ?>" href="<?= base_url('user/orders') ?>">
-                                    <i class="bi bi-box-seam"></i> Pesanan
-                                </a>
-                            </li>
-                        <?php endif; ?>
+                        <!-- Orders Link -->
+                        <li class="nav-item">
+                            <a class="nav-link <?= strpos(uri_string(), 'order') !== false ? 'active' : '' ?>" href="<?= base_url('order/checkout') ?>">
+                                <i class="bi bi-bag-plus"></i> Pesanan
+                            </a>
+                        </li>
                         
                         <!-- User Dropdown -->
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                                <i class="bi bi-person-circle"></i> <?= esc($user['name']) ?>
+                                <i class="bi bi-person-circle"></i> <?= esc($user['name'] ?? 'User') ?>
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end">
                                 <?php if (is_admin()): ?>
                                     <li>
                                         <a class="dropdown-item" href="<?= base_url('admin/dashboard') ?>">
-                                            <i class="bi bi-speedometer2"></i> Dashboard Admin
-                                        </a>
-                                    </li>
-                                    <li><hr class="dropdown-divider"></li>
-                                <?php else: ?>
-                                    <li>
-                                        <a class="dropdown-item" href="<?= base_url('user/orders') ?>">
-                                            <i class="bi bi-box-seam"></i> Pesanan Saya
-                                        </a>
-                                    </li>
-                                    <li>
-                                        <a class="dropdown-item" href="<?= base_url('user/profile') ?>">
-                                            <i class="bi bi-person"></i> Profile
+                                            <i class="bi bi-speedometer2 text-danger"></i> Admin Dashboard
                                         </a>
                                     </li>
                                     <li><hr class="dropdown-divider"></li>
                                 <?php endif; ?>
+                                
+                                <!-- User Menu - Always show for all users -->
+                                <li>
+                                    <a class="dropdown-item" href="<?= base_url('user/dashboard') ?>">
+                                        <i class="bi bi-house-door text-primary"></i> Dashboard
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="<?= base_url('user/orders') ?>">
+                                        <i class="bi bi-box-seam text-info"></i> Pesanan Saya
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="<?= base_url('user/profile') ?>">
+                                        <i class="bi bi-person text-success"></i> Profile
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
                                 <li>
                                     <a class="dropdown-item text-danger" href="<?= base_url('auth/logout') ?>">
                                         <i class="bi bi-box-arrow-right"></i> Logout
@@ -372,7 +376,7 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="btn btn-navbar" href="<?= base_url('order/create') ?>">
+                            <a class="btn btn-navbar" href="<?= base_url('order/checkout') ?>">
                                 <i class="bi bi-bag-plus"></i> Pesan Sekarang
                             </a>
                         </li>
@@ -494,7 +498,7 @@
                             </a>
                         </li>
                         <li class="mb-2">
-                            <a href="<?= base_url('order/create') ?>">
+                            <a href="<?= base_url('order/checkout') ?>">
                                 <i class="bi bi-chevron-right"></i> Cara Pemesanan
                             </a>
                         </li>

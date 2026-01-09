@@ -3,29 +3,24 @@
 <?php
 helper('format');
 
-// Status options sesuai API
+// Status options sesuai dengan Laravel database enum
 $statusOptions = [
-    'waiting_pickup' => 'Menunggu Pickup',
-    'on_the_way_to_workshop' => 'Dalam Perjalanan ke Workshop',
-    'arrived_at_workshop' => 'Tiba di Workshop',
-    'in_process' => 'Sedang Diproses',
-    'cleaning_done' => 'Selesai Dicuci',
-    'on_the_way_to_customer' => 'Dalam Pengiriman',
-    'delivered' => 'Terkirim',
+    'waiting_pickup' => 'Menunggu Penjemputan',
+    'dalam_penjemputan' => 'Dalam Penjemputan',
+    'in_progress' => 'Sedang Diproses',
+    'ready_for_delivery' => 'Siap Diantar',
+    'on_delivery' => 'Dalam Pengiriman',
     'completed' => 'Selesai',
     'cancelled' => 'Dibatalkan'
 ];
 
 function getStatusBadgeClass($status) {
     $classes = [
-        'pending' => 'bg-warning text-dark',
-        'waiting_pickup' => 'bg-info',
-        'on_the_way_to_workshop' => 'bg-info',
-        'arrived_at_workshop' => 'bg-primary',
-        'in_process' => 'bg-primary',
-        'cleaning_done' => 'bg-success',
-        'on_the_way_to_customer' => 'bg-info',
-        'delivered' => 'bg-success',
+        'waiting_pickup' => 'bg-warning text-dark',
+        'dalam_penjemputan' => 'bg-info',
+        'in_progress' => 'bg-primary',
+        'ready_for_delivery' => 'bg-success',
+        'on_delivery' => 'bg-info',
         'completed' => 'bg-success',
         'cancelled' => 'bg-danger'
     ];
@@ -34,14 +29,11 @@ function getStatusBadgeClass($status) {
 
 function getStatusLabel($status) {
     $labels = [
-        'pending' => 'Menunggu',
         'waiting_pickup' => 'Menunggu Pickup',
-        'on_the_way_to_workshop' => 'Ke Workshop',
-        'arrived_at_workshop' => 'Di Workshop',
-        'in_process' => 'Diproses',
-        'cleaning_done' => 'Selesai Cuci',
-        'on_the_way_to_customer' => 'Dikirim',
-        'delivered' => 'Terkirim',
+        'dalam_penjemputan' => 'Dalam Penjemputan',
+        'in_progress' => 'Diproses',
+        'ready_for_delivery' => 'Siap Antar',
+        'on_delivery' => 'Dikirim',
         'completed' => 'Selesai',
         'cancelled' => 'Dibatalkan'
     ];
@@ -57,6 +49,19 @@ function getPaymentBadgeClass($status) {
         'refunded' => 'bg-info'
     ];
     return $classes[$status] ?? 'bg-secondary';
+}
+
+function getStatusIcon($status) {
+    $icons = [
+        'waiting_pickup' => 'bi-clock',
+        'dalam_penjemputan' => 'bi-truck',
+        'in_progress' => 'bi-gear-fill',
+        'ready_for_delivery' => 'bi-box-seam',
+        'on_delivery' => 'bi-bicycle',
+        'completed' => 'bi-check-circle-fill',
+        'cancelled' => 'bi-x-circle-fill'
+    ];
+    return $icons[$status] ?? 'bi-circle';
 }
 ?>
 
@@ -75,6 +80,15 @@ function getPaymentBadgeClass($status) {
                 </nav>
                 <h2 class="mb-0 fw-bold"><i class="bi bi-bag-check"></i> Manajemen Order</h2>
             </div>
+            <!-- Filter -->
+            <div class="d-flex gap-2">
+                <select class="form-select" id="filterStatus" onchange="filterOrders()">
+                    <option value="">Semua Status</option>
+                    <?php foreach ($statusOptions as $value => $label): ?>
+                        <option value="<?= $value ?>"><?= $label ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
         </div>
     </div>
 </section>
@@ -86,6 +100,81 @@ function getPaymentBadgeClass($status) {
             <div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> <?= esc($error) ?></div>
         <?php endif; ?>
 
+        <!-- Stats Cards -->
+        <?php
+        $stats = [
+            'waiting_pickup' => 0,
+            'dalam_penjemputan' => 0,
+            'in_progress' => 0,
+            'ready_for_delivery' => 0,
+            'on_delivery' => 0,
+            'completed' => 0,
+            'cancelled' => 0
+        ];
+        foreach ($orders ?? [] as $o) {
+            $s = $o['order_status'] ?? '';
+            if (isset($stats[$s])) {
+                $stats[$s]++;
+            }
+        }
+        ?>
+        <div class="row g-3 mb-4">
+            <div class="col-lg-2 col-md-4 col-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <i class="bi bi-clock fs-3 text-warning"></i>
+                        <h4 class="mb-0 mt-2"><?= $stats['waiting_pickup'] ?></h4>
+                        <small class="text-muted">Menunggu Pickup</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4 col-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <i class="bi bi-truck fs-3 text-info"></i>
+                        <h4 class="mb-0 mt-2"><?= $stats['dalam_penjemputan'] ?></h4>
+                        <small class="text-muted">Dijemput</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4 col-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <i class="bi bi-gear-fill fs-3 text-primary"></i>
+                        <h4 class="mb-0 mt-2"><?= $stats['in_progress'] ?></h4>
+                        <small class="text-muted">Diproses</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4 col-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <i class="bi bi-box-seam fs-3 text-success"></i>
+                        <h4 class="mb-0 mt-2"><?= $stats['ready_for_delivery'] + $stats['on_delivery'] ?></h4>
+                        <small class="text-muted">Delivery</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4 col-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <i class="bi bi-check-circle-fill fs-3 text-success"></i>
+                        <h4 class="mb-0 mt-2"><?= $stats['completed'] ?></h4>
+                        <small class="text-muted">Selesai</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4 col-6">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <i class="bi bi-x-circle-fill fs-3 text-danger"></i>
+                        <h4 class="mb-0 mt-2"><?= $stats['cancelled'] ?></h4>
+                        <small class="text-muted">Dibatalkan</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Orders Table -->
         <div class="card shadow-sm">
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
@@ -95,7 +184,7 @@ function getPaymentBadgeClass($status) {
             <div class="card-body p-0">
                 <?php if (!empty($orders)): ?>
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
+                        <table class="table table-hover align-middle mb-0" id="ordersTable">
                             <thead class="table-light">
                                 <tr>
                                     <th>Order #</th>
@@ -110,7 +199,7 @@ function getPaymentBadgeClass($status) {
                             </thead>
                             <tbody>
                                 <?php foreach ($orders as $order): ?>
-                                    <tr>
+                                    <tr data-status="<?= esc($order['order_status'] ?? '') ?>">
                                         <td>
                                             <strong class="text-primary"><?= esc($order['order_number'] ?? '-') ?></strong>
                                         </td>
@@ -133,6 +222,7 @@ function getPaymentBadgeClass($status) {
                                         </td>
                                         <td>
                                             <span class="badge <?= getStatusBadgeClass($order['order_status'] ?? '') ?>">
+                                                <i class="<?= getStatusIcon($order['order_status'] ?? '') ?>"></i>
                                                 <?= getStatusLabel($order['order_status'] ?? '') ?>
                                             </span>
                                         </td>
@@ -193,7 +283,6 @@ function getPaymentBadgeClass($status) {
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label fw-bold">Status Baru *</label>
-                        <!-- PENTING: name harus "order_status" bukan "status" -->
                         <select class="form-select" name="order_status" id="newStatus" required>
                             <option value="">-- Pilih Status --</option>
                             <?php foreach ($statusOptions as $value => $label): ?>
@@ -201,6 +290,18 @@ function getPaymentBadgeClass($status) {
                             <?php endforeach; ?>
                         </select>
                     </div>
+                    
+                    <!-- Status Flow Guide -->
+                    <div class="alert alert-light small mb-3">
+                        <strong><i class="bi bi-info-circle"></i> Alur Status:</strong><br>
+                        <span class="badge bg-warning text-dark">Menunggu</span> →
+                        <span class="badge bg-info">Dijemput</span> →
+                        <span class="badge bg-primary">Diproses</span> →
+                        <span class="badge bg-success">Siap</span> →
+                        <span class="badge bg-info">Dikirim</span> →
+                        <span class="badge bg-success">Selesai</span>
+                    </div>
+                    
                     <div class="mb-3">
                         <label class="form-label fw-bold">Catatan (Opsional)</label>
                         <textarea class="form-control" name="notes" id="statusNotes" rows="3" 
@@ -230,6 +331,20 @@ document.addEventListener('DOMContentLoaded', function() {
     statusModal = new bootstrap.Modal(document.getElementById('statusModal'));
 });
 
+// Filter orders by status
+function filterOrders() {
+    const filterValue = document.getElementById('filterStatus').value;
+    const rows = document.querySelectorAll('#ordersTable tbody tr');
+    
+    rows.forEach(row => {
+        if (!filterValue || row.dataset.status === filterValue) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
 // Open Status Modal
 function openStatusModal(orderNumber, currentStatus) {
     document.getElementById('statusOrderNumber').value = orderNumber;
@@ -245,12 +360,6 @@ document.getElementById('updateStatusForm').addEventListener('submit', async fun
     const orderNumber = document.getElementById('statusOrderNumber').value;
     const formData = new FormData(this);
     
-    // Debug: lihat apa yang dikirim
-    console.log('Sending data:');
-    for (let [key, value] of formData.entries()) {
-        console.log(key + ': ' + value);
-    }
-    
     try {
         Swal.fire({
             title: 'Memproses...',
@@ -265,7 +374,6 @@ document.getElementById('updateStatusForm').addEventListener('submit', async fun
         });
         
         const result = await response.json();
-        console.log('Response:', result);
         
         if (result.success) {
             Swal.fire({
