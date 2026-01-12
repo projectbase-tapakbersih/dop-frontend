@@ -1,24 +1,17 @@
 <?php
 
-namespace App\Controllers\Order;
+namespace App\Controllers;
 
 use App\Controllers\BaseController;
 
 /**
- * Guest Order Controller
+ * Guest Controller
  * Handle guest order tracking without login
- * 
- * Routes:
- * - GET /guest/track -> trackPage()
- * - POST /guest/track -> track()
- * - GET /guest/order/{order_number} -> detail()
- * - POST /guest/order/{order_number}/cancel -> cancel()
  * 
  * API Endpoints:
  * - GET /api/guest/orders/{order_number} - Get guest order detail
- * - POST /api/guest/orders/{order_number}/cancel - Cancel guest order
  */
-class GuestOrderController extends BaseController
+class GuestController extends BaseController
 {
     public function __construct()
     {
@@ -45,7 +38,7 @@ class GuestOrderController extends BaseController
             $data['searched'] = true;
             $data['order_number'] = $orderNumber;
             
-            // Try to get guest order - API: GET /api/guest/orders/{order_number}
+            // Try to get guest order
             $response = api_request("/guest/orders/{$orderNumber}", 'GET', [], false);
             
             log_message('info', "Guest Track Order {$orderNumber}: " . json_encode($response));
@@ -64,10 +57,10 @@ class GuestOrderController extends BaseController
     }
 
     /**
-     * Track Order via POST (AJAX)
+     * Track Order API (AJAX)
      * POST /guest/track
      */
-    public function track()
+    public function trackOrder()
     {
         $orderNumber = $this->request->getPost('order_number');
         
@@ -106,9 +99,9 @@ class GuestOrderController extends BaseController
 
     /**
      * Guest Order Detail Page
-     * GET /guest/order/{order_number}
+     * GET /guest/orders/{order_number}
      */
-    public function detail($orderNumber)
+    public function orderDetail($orderNumber)
     {
         $data = [
             'title' => 'Detail Pesanan - ' . $orderNumber,
@@ -130,33 +123,5 @@ class GuestOrderController extends BaseController
         }
 
         return view('guest/order_detail', $data);
-    }
-
-    /**
-     * Cancel Guest Order
-     * POST /guest/order/{order_number}/cancel
-     */
-    public function cancel($orderNumber)
-    {
-        $reason = $this->request->getPost('reason') ?? 'Dibatalkan oleh customer';
-
-        // API: POST /api/guest/orders/{order_number}/cancel
-        $response = api_request("/guest/orders/{$orderNumber}/cancel", 'POST', [
-            'reason' => $reason
-        ], false);
-        
-        log_message('info', "Cancel Guest Order {$orderNumber}: " . json_encode($response));
-
-        if (isset($response['success']) && $response['success']) {
-            return $this->response->setJSON([
-                'success' => true,
-                'message' => $response['message'] ?? 'Pesanan berhasil dibatalkan'
-            ]);
-        }
-
-        return $this->response->setJSON([
-            'success' => false,
-            'message' => $response['message'] ?? 'Gagal membatalkan pesanan'
-        ]);
     }
 }

@@ -325,7 +325,7 @@
                         
                         <!-- Orders Link -->
                         <li class="nav-item">
-                            <a class="nav-link <?= strpos(uri_string(), 'order') !== false ? 'active' : '' ?>" href="<?= base_url('order/checkout') ?>">
+                            <a class="nav-link <?= strpos(uri_string(), 'order') !== false ? 'active' : '' ?>" href="<?= base_url('order/create') ?>">
                                 <i class="bi bi-bag-plus"></i> Pesanan
                             </a>
                         </li>
@@ -370,13 +370,19 @@
                             </ul>
                         </li>
                     <?php else: ?>
+                        <!-- Guest Menu -->
+                        <li class="nav-item">
+                            <a class="nav-link <?= strpos(uri_string(), 'guest/track') !== false ? 'active' : '' ?>" href="<?= base_url('guest/track') ?>">
+                                <i class="bi bi-search"></i> Lacak Pesanan
+                            </a>
+                        </li>
                         <li class="nav-item">
                             <a class="nav-link" href="<?= base_url('auth/login') ?>">
                                 <i class="bi bi-box-arrow-in-right"></i> Login
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="btn btn-navbar" href="<?= base_url('order/checkout') ?>">
+                            <a class="btn btn-navbar" href="<?= base_url('order/create') ?>">
                                 <i class="bi bi-bag-plus"></i> Pesan Sekarang
                             </a>
                         </li>
@@ -475,6 +481,11 @@
                                 <i class="bi bi-chevron-right"></i> Cabang
                             </a>
                         </li>
+                        <li class="mb-2">
+                            <a href="<?= base_url('guest/track') ?>">
+                                <i class="bi bi-chevron-right"></i> Lacak Pesanan
+                            </a>
+                        </li>
                     </ul>
                 </div>
                 
@@ -498,7 +509,7 @@
                             </a>
                         </li>
                         <li class="mb-2">
-                            <a href="<?= base_url('order/checkout') ?>">
+                            <a href="<?= base_url('order/create') ?>">
                                 <i class="bi bi-chevron-right"></i> Cara Pemesanan
                             </a>
                         </li>
